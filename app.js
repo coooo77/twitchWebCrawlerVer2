@@ -1,5 +1,39 @@
-var os = require('os');
+const { puppeteerSetting, url } = require('./config/config')
+const { login } = require('./config/domSelector')
+const { app } = require('./config/announce')
+const helper = require('./util/helper')
+require('dotenv').config()
+const puppeteer = require('puppeteer-core');
 
-// console.log(os.cpus());
-console.log(os.totalmem());
-console.log(os.freemem())
+(async () => {
+  const browser = await puppeteer.launch(puppeteerSetting);
+  const page = await browser.newPage();
+  try {
+    await page.goto(url.twitch, { waitUntil: 'domcontentloaded' });
+    await helper.wait(2000)
+    // 檢查是否需要登入
+    const facebookBtn = await page.$(login.facebookBtn)
+    await page.screenshot({ path: 'facebookBtn.png' });
+    if (facebookBtn) {
+      helper.announcer(app.startToLogin)
+      // 開始登入
+      const { account, password } = await helper.getAccountAndPassword()
+      await helper.login(page, account, password)
+      await helper.wait(2000)
+      //驗證SMS
+      const confirmSMSBtn = await page.$(login.confirmSMSBtn)
+      if (confirmSMSBtn) {
+        await helper.verifySMS(page)
+      }
+      await helper.clickAndNavigate(page, login.confirmSMSBtn, 2000)
+    }
+
+    await page.screenshot({ path: 'homePage.png' });
+    console.log('Done')
+  } catch (error) {
+    console.error(error)
+  } finally {
+    await page.close();
+    await browser.close()
+  }
+})()
