@@ -13,7 +13,7 @@ const puppeteer = require('puppeteer-core');
     await helper.wait(2000)
     // 檢查是否需要登入
     const facebookBtn = await page.$(login.facebookBtn)
-    await page.screenshot({ path: 'facebookBtn.png' });
+    // await page.screenshot({ path: 'facebookBtn.png' });
     if (facebookBtn) {
       helper.announcer(app.startToLogin)
       // 開始登入
@@ -28,7 +28,9 @@ const puppeteer = require('puppeteer-core');
       await helper.clickAndNavigate(page, login.confirmSMSBtn, 2000)
     }
 
-    await page.screenshot({ path: 'homePage.png' });
+    // await page.screenshot({ path: 'homePage.png' });
+    await helper.scrollDownUntilCanNot(page)
+
     console.log('Done')
   } catch (error) {
     console.error(error)

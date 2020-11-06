@@ -1,9 +1,9 @@
 const readline = require('readline');
 const { loginSetting } = require('../config/config')
-const { login } = require('../config/domSelector')
+const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
 
-module.exports = {
+const helper = {
   wait(ms) {
     return new Promise(resolve => setTimeout(() => resolve(), ms))
   },
@@ -70,5 +70,31 @@ module.exports = {
     const SMS = await helper.manualInput(app.askSMS)
     await helper.clickAndInput(page, login.inputSMS, SMS)
     await page.click(login.confirmSMSBtn)
+  },
+  async scrollDownUntilCanNot(page) {
+    // let count = 0
+    let height = await helper.measureHeight(page)
+    const viewportHeight = page.viewport().height
+    let viewportIncr = 0
+
+    while (viewportIncr + viewportHeight < height) {
+      const params = { viewportHeight, selector: homePage.scrollBody }
+      await page.evaluate(_params => {
+        const target = document.querySelector(_params.selector)
+        target.scrollBy(0, _params.viewportHeight)
+      }, params)
+      await helper.wait(20)
+      height = await helper.measureHeight(page)
+      viewportIncr = viewportIncr + viewportHeight
+      // await page.screenshot({ path: `${++count}.png` })
+    }
+  },
+  async measureHeight(page) {
+    const mainBody = await page.$(homePage.mainBody)
+    const { height } = await mainBody.boxModel()
+    await mainBody.dispose()
+    return height
   }
 }
+
+module.exports = helper
