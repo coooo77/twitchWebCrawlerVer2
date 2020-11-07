@@ -15,6 +15,42 @@ module.exports = {
         stopRecord: 'Space is not enough, stop record progress ...',
         StartRecord: 'Space is enough, start record progress ...'
       }
+    },
+    upDate: {
+      usersData: 'Users data userData.json updated',
+      seedData: 'Seed data seedData.json updated',
+      isStreaming: 'Stream record isStreaming.json updated'
     }
-  }
+  },
+  init: {
+    folder: {
+      recorder: {
+        isNotExist: 'Directory recorder is not exist',
+        startToCreateDirectory: 'Start to create recorder directory'
+      },
+      model: {
+        isNotExist: 'Directory model is not exist',
+        startToCreateDirectory: 'Start to create model directory'
+      },
+      seed: {
+        isNotExist: 'Directory seed is not exist',
+        startToCreateDirectory: 'Start to create seed directory'
+      }
+    },
+    jsonFile: {
+      isStreaming: {
+        isNotExist: 'isStreaming.json is not exist',
+        startToCreate: 'Start to create isStreaming.json'
+      },
+      usersData: {
+        isNotExist: 'UsersData.json is not exist',
+        startToCreate: 'Start to create usersData.json'
+      },
+      seedData: {
+        isNotExist: 'seedData.json is not exist',
+        startToCreate: 'Start to create seedData.json'
+      }
+    },
+    initiationIsFinished: 'Initiation finished'
+  },
 }

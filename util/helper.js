@@ -3,6 +3,7 @@ const { loginSetting, recordSetting, checkDiskSpaceAction } = require('../config
 const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
 const checkDiskSpace = require('check-disk-space')
+const fs = require('fs');
 
 const helper = {
   wait(ms) {
@@ -141,7 +142,45 @@ const helper = {
     }
     helper.announcer(app.recordAction.checkFreeDiskSpace.freeSpace(info, limit))
     return spaceLeft > number
-  }
+  },
+  saveJSObjData(data, fileName = 'usersData', dirLocation = './model/') {
+    return new Promise((resolve, reject) => {
+      try {
+        fs.writeFileSync(
+          `${dirLocation}${fileName}.json`,
+          JSON.stringify(data),
+          'utf8',
+          (error) => {
+            console.log(error);
+          })
+        helper.announcer(app.upDate[`${fileName}`])
+        resolve()
+      } catch (error) {
+        console.error(error)
+        reject(error)
+      }
+    })
+  },
+  async getJSObjData(dataLocation) {
+    let result = await fs.readFileSync(dataLocation, 'utf8', (err, data) => data)
+    result = JSON.parse(result)
+    return result
+  },
+  makeDirIfNotExist(info, location) {
+    if (!fs.existsSync(location)) {
+      helper.announcer(info.isNotExist)
+      helper.announcer(info.startToCreateDirectory)
+      fs.mkdirSync(location)
+    }
+  },
+  async makeJsonIfNotExist(setting) {
+    const { dataLocation, info, defaultData, fileName, fileLocation } = setting
+    if (!fs.existsSync(dataLocation)) {
+      helper.announcer(info.isNotExist)
+      helper.announcer(info.startToCreate)
+      await helper.saveJSObjData(defaultData, fileName, fileLocation)
+    }
+  },
 }
 
 module.exports = helper
