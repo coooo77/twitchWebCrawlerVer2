@@ -1,4 +1,5 @@
 const readline = require('readline');
+const twitchStreams = require('twitch-get-stream')
 const { loginSetting, recordSetting, checkDiskSpaceAction } = require('../config/config')
 const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
@@ -181,6 +182,55 @@ const helper = {
       await helper.saveJSObjData(defaultData, fileName, fileLocation)
     }
   },
+  removeRecord(data, index) {
+    data.ids.splice(index, 1)
+    data.records.splice(index, 1)
+  },
+  upDateIsRecording(data, userId) {
+    const userIndex = data.records.findIndex(user => user.twitchID === userId)
+    data.records[userIndex].isRecording = false
+  },
+  async checkChannelStatus(twitchID) {
+    let result
+    try {
+      const response = await twitchStreams.get(twitchID)
+      result = response.length
+    } catch (error) {
+      result = error.response.status
+    } finally {
+      return result !== 404
+    }
+  },
+  async checkLivingChannel(onlineStreamsData) {
+    const { livingChannel } = app.recordAction
+    helper.announcer(livingChannel.checkStatus)
+    const [isStreaming, usersData] = await Promise.all([
+      helper.getJSObjData('./model/isStreaming.json'),
+      helper.getJSObjData('./model/usersData.json')
+    ])
+    const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
+
+    if (isStreaming.ids.length !== 0) {
+      for (let i = 0; i < isStreaming.ids.length; i++) {
+        if (livingChannelList.includes(isStreaming.ids[i])) {
+          helper.announcer(livingChannel.userIsStillStreaming(isStreaming.ids[i]))
+        } else {
+          // 二次確認使用者是不是真的下線
+          const isChannelOnline = await helper.checkChannelStatus(isStreaming.ids[i])
+          if (isChannelOnline) {
+            helper.announcer(livingChannel.userIsStillStreaming(isStreaming.ids[i]))
+          } else {
+            helper.announcer(livingChannel.userClosesStreaming(isStreaming.ids[i]))
+            helper.removeRecord(isStreaming, i)
+            helper.upDateIsRecording(usersData, isStreaming.ids[i])
+          }
+        }
+      }
+      await helper.saveJSObjData(isStreaming, 'isStreaming')
+    } else {
+      helper.announcer(livingChannel.isNoLivingChannel)
+    }
+  }
 }
 
 module.exports = helper

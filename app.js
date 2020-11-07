@@ -48,8 +48,8 @@ const puppeteer = require('puppeteer-core');
     const onlineStreamsData = await helper.getOnlineStreamsData(page)
     // console.log('onlineStreamsData', onlineStreamsData)
 
-
-
+    // 檢查是否有實況主下線，是的話把isRecording改為false
+    await checkLivingChannel(onlineStreamsData)
 
     console.log('Done')
   } catch (error) {

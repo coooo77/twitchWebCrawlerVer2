@@ -14,6 +14,14 @@ module.exports = {
         freeSpace: (number, limit) => `Free space is ${number} left (limit: ${limit})`,
         stopRecord: 'Space is not enough, stop record progress ...',
         StartRecord: 'Space is enough, start record progress ...'
+      },
+      livingChannel: {
+        checkStatus: 'Check if any of users is offline...',
+        isNoLivingChannel: 'No target user streaming',
+        userIsStillStreaming: msg => `${msg} is still streaming`,
+        userClosesStreaming: msg => `${msg} is offline, start to delete recording`,
+        isTargetExist: 'Check if target user exist in living channels ...',
+
       }
     },
     upDate: {
