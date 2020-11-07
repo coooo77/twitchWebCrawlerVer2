@@ -30,7 +30,9 @@ const puppeteer = require('puppeteer-core');
 
     // await page.screenshot({ path: 'homePage.png' });
     await helper.scrollDownUntilCanNot(page)
-
+    // 取得實況主英文ID與實況類型
+    const onlineStreamsData = await helper.getOnlineStreamsData(page)
+    console.log('onlineStreamsData', onlineStreamsData)
     console.log('Done')
   } catch (error) {
     console.error(error)

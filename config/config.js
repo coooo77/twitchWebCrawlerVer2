@@ -17,7 +17,6 @@ module.exports = {
     }
   },
   recordSetting: {
-    checkStreamContentType: true,
     reTryInterval: 30,
     maxTryTimes: 120,
     prefix: '@',

@@ -94,6 +94,21 @@ const helper = {
     const { height } = await mainBody.boxModel()
     await mainBody.dispose()
     return height
+  },
+  async getOnlineStreamsData(page) {
+    const streamers = await page.evaluate(selector => {
+      const data = Array.from(document.querySelectorAll(selector))
+      return data.map(node => {
+        const html = node.innerHTML
+        const handleHtml = html.split(' ')
+        const href = handleHtml.filter(str => str.includes('href='))
+        const twitchID = href[1].split('/')[1]
+        const gameTypeHref = href[2].split('"')[1]
+        const streamTypes = gameTypeHref.split('/')[3]
+        return ({ twitchID, streamTypes })
+      })
+    }, homePage.liveCannelCard)
+    return streamers
   }
 }
 
