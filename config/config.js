@@ -7,16 +7,24 @@ module.exports = {
   url: {
     twitch: 'https://www.twitch.tv/directory/following/live'
   },
-  stopRecordAction: {
-    isActive: false,
-    activeBy: {
-      percentage: 'percentage',
-      MB: Math.pow(2, 20),
-      GB: Math.pow(2, 30),
-      TB: Math.pow(2, 40),
+  checkDiskSpaceAction: {
+    isActive: true,
+    judgeBy: {
+      below: {
+        number: 100,
+        unit: 'GB', // choose 'percentage','MB','GB' or 'TB'
+        digit: 2
+      },
+      type: {
+        percentage: 'percentage',
+        MB: Math.pow(2, 20),
+        GB: Math.pow(2, 30),
+        TB: Math.pow(2, 40),
+      }
     }
   },
   recordSetting: {
+    locationOfDiskWhereRecordSaved: 'D:/',
     reTryInterval: 30,
     maxTryTimes: 120,
     prefix: '@',

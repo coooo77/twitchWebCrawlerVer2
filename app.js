@@ -1,4 +1,4 @@
-const { puppeteerSetting, url } = require('./config/config')
+const { puppeteerSetting, url, checkDiskSpaceAction } = require('./config/config')
 const { login } = require('./config/domSelector')
 const { app } = require('./config/announce')
 const helper = require('./util/helper')
@@ -32,7 +32,24 @@ const puppeteer = require('puppeteer-core');
     await helper.scrollDownUntilCanNot(page)
     // 取得實況主英文ID與實況類型
     const onlineStreamsData = await helper.getOnlineStreamsData(page)
-    console.log('onlineStreamsData', onlineStreamsData)
+    // console.log('onlineStreamsData', onlineStreamsData)
+
+    // 檢查硬碟空間
+    if (checkDiskSpaceAction.isActive) {
+      const checkFreeDiskSpace = app.recordAction.checkFreeDiskSpace
+      helper.announcer(checkFreeDiskSpace.info)
+      const isDiskSpaceEnough = await helper.checkDiskSpace()
+      if (isDiskSpaceEnough) {
+        helper.announcer(checkFreeDiskSpace.StartRecord)
+      } else {
+        helper.announcer(checkFreeDiskSpace.stopRecord)
+        return
+      }
+    }
+
+
+
+
     console.log('Done')
   } catch (error) {
     console.error(error)

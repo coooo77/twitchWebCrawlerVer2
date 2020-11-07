@@ -1,7 +1,8 @@
 const readline = require('readline');
-const { loginSetting } = require('../config/config')
+const { loginSetting, recordSetting, checkDiskSpaceAction } = require('../config/config')
 const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
+const checkDiskSpace = require('check-disk-space')
 
 const helper = {
   wait(ms) {
@@ -109,6 +110,37 @@ const helper = {
       })
     }, homePage.liveCannelCard)
     return streamers
+  },
+  async checkDiskSpace() {
+    const { free, size } = await checkDiskSpace(recordSetting.locationOfDiskWhereRecordSaved)
+    const { type, below } = checkDiskSpaceAction.judgeBy
+    const { unit, digit, number } = below
+    let spaceLeft, info, limit
+    switch (unit) {
+      case 'percentage':
+        spaceLeft = (free / size) * 100
+        info = `${spaceLeft.toFixed(digit)} %`
+        limit = `${number} %`
+        break;
+      case 'MB':
+        spaceLeft = (free / type.MB)
+        info = `${spaceLeft.toFixed(digit)} MB`
+        limit = `${number} MB`
+        break;
+      case 'GB':
+        spaceLeft = (free / type.GB)
+        info = `${spaceLeft.toFixed(digit)} GB`
+        limit = `${number} GB`
+        break;
+      case 'TB':
+        spaceLeft = (free / type.TB)
+        info = `${spaceLeft.toFixed(digit)} TB`
+        limit = `${number} TB`
+        break;
+      default:
+    }
+    helper.announcer(app.recordAction.checkFreeDiskSpace.freeSpace(info, limit))
+    return spaceLeft > number
   }
 }
 
