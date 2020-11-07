@@ -5,7 +5,8 @@
   "main": "twitch.js",
   "scripts": {
     "dev": "node app.js",
-    "init": "node init.js & touch .env"
+    "init": "node init.js & touch .env",
+    "seed": "node seed.js"
   },
   "author": "coooo77",
   "license": "ISC",

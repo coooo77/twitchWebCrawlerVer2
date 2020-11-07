@@ -53,4 +53,9 @@ module.exports = {
     },
     initiationIsFinished: 'Initiation finished'
   },
+  seed: {
+    initiation: 'Start input seed data to usersData...',
+    initiationIsFinished: 'Seeding progress finished',
+    numOfUsers: msg => `${msg} users are saved in usersData.json`
+  }
 }

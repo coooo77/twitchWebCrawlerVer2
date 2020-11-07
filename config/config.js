@@ -32,6 +32,13 @@ module.exports = {
   },
   loginSetting: {
     isManual: false
+  },
+  seedUsersDataSetting: {
+    isRecording: false,
+    checkStreamContentType: {
+      isActive: true,
+      targetType: ['Art', 'Just%20Chatting']
+    }
   }
 }
 
