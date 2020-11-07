@@ -28,12 +28,6 @@ const puppeteer = require('puppeteer-core');
       await helper.clickAndNavigate(page, login.confirmSMSBtn, 2000)
     }
 
-    // await page.screenshot({ path: 'homePage.png' });
-    await helper.scrollDownUntilCanNot(page)
-    // 取得實況主英文ID與實況類型
-    const onlineStreamsData = await helper.getOnlineStreamsData(page)
-    // console.log('onlineStreamsData', onlineStreamsData)
-
     // 檢查硬碟空間
     if (checkDiskSpaceAction.isActive) {
       const checkFreeDiskSpace = app.recordAction.checkFreeDiskSpace
@@ -46,6 +40,13 @@ const puppeteer = require('puppeteer-core');
         return
       }
     }
+
+    // 開始錄影
+    // await page.screenshot({ path: 'homePage.png' });
+    await helper.scrollDownUntilCanNot(page)
+    // 取得實況主英文ID與實況類型
+    const onlineStreamsData = await helper.getOnlineStreamsData(page)
+    // console.log('onlineStreamsData', onlineStreamsData)
 
 
 
