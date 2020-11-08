@@ -6,7 +6,7 @@
   helper.announcer(seed.initiation)
 
   const [seedData, usersData] = await Promise.all([
-    helper.getJSObjData('./model/seed/seed.json'),
+    helper.getJSObjData('./model/seed/seedData.json'),
     helper.getJSObjData('./model/usersData.json')
   ])
 
@@ -21,7 +21,6 @@
   usersData.ids = ids
 
   await helper.saveJSObjData(usersData)
-  
   helper.announcer(seed.numOfUsers(seedData.length))
   helper.announcer(seed.initiationIsFinished)
 })()

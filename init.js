@@ -45,7 +45,7 @@
         dataLocation: './model/seed/seedData.json',
         info: seedData,
         defaultData: [{ twitchID: 'fill Twitch User Id You Want To Follow' }],
-        fileName: 'seed',
+        fileName: 'seedData',
         fileLocation: './model/seed/'
       }
     ]
