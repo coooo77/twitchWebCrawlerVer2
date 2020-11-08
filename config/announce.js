@@ -1,3 +1,5 @@
+const { recordSetting } = require('./config')
+const { prefix } = recordSetting
 module.exports = {
   app: {
     startToLogin: 'User needs to login, start to login...',
@@ -16,15 +18,15 @@ module.exports = {
         StartRecord: 'Space is enough, start record progress ...'
       },
       livingChannel: {
-        checkStatus: 'Check if any of users is offline...',
+        checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
         userClosesStreaming: msg => `${msg} is offline, start to delete recording`,
         isTargetExist: 'Check if target user exist in living channels ...'
       },
       record: {
-        start: 'Start to check and record stream',
-        stop: user => `Stop to record user ${user}, type of stream content isn't target type`,
+        start: '=> Start to check and record stream...',
+        stop: (user, reason = 'type') => `Stop to record user ${user}, ${reason === 'type' ? `type of stream content isn't target type` : `stream is still in retry interval`}`,
         findOnlineUser: user => `User ${user} is streaming, start to Record`
       }
     },
@@ -32,7 +34,13 @@ module.exports = {
       usersData: 'Users data userData.json updated',
       seedData: 'Seed data seedData.json updated',
       isStreaming: 'Stream record isStreaming.json updated'
-    }
+    },
+    batchFile: {
+      isExist: twitchID => `File ${twitchID}.bat exists`,
+      isNotExist: twitchID => `File ${twitchID}.bat does not exist`,
+      created: msg => `Create ${prefix}${msg}.bat`,
+      processKilled: msg => `${msg}'s record process killed`
+    },
   },
   init: {
     folder: {

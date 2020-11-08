@@ -1,9 +1,11 @@
 const readline = require('readline');
 const twitchStreams = require('twitch-get-stream')
 const { loginSetting, recordSetting, checkDiskSpaceAction } = require('../config/config')
+const { locationOfDiskWhereRecordSaved, locationOfFolderWhereRecordSaved, reTryInterval, maxTryTimes, prefix, stopRecordDuringReTryInterval } = recordSetting
 const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
 const checkDiskSpace = require('check-disk-space')
+const cp = require('child_process')
 const fs = require('fs');
 
 const helper = {
@@ -114,7 +116,7 @@ const helper = {
     return streamers
   },
   async checkDiskSpace() {
-    const { free, size } = await checkDiskSpace(recordSetting.locationOfDiskWhereRecordSaved)
+    const { free, size } = await checkDiskSpace(locationOfDiskWhereRecordSaved)
     const { type, below } = checkDiskSpaceAction.judgeBy
     const { unit, digit, number } = below
     let spaceLeft, info, limit
@@ -231,28 +233,28 @@ const helper = {
       helper.announcer(livingChannel.isNoLivingChannel)
     }
   },
-  async startToRecordStream(onlineStreamsData, isStreaming, usersData) {
+  async startToRecordStream(onlineStreamsData, isStreaming, usersData, dirName) {
     helper.announcer(app.recordAction.record.start)
     for (let i = 0; i < onlineStreamsData.length; i++) {
       const { twitchID, streamTypes } = onlineStreamsData[i]
 
-      const user = usersData.records.filter(user => user.twitchID === twitchID)
-      const recordingUser = isStreaming.records.filter(user => user.twitchID === twitchID)
+      const user = usersData.records.find(user => user.twitchID === twitchID)
+      const recordingUser = isStreaming.records.find(user => user.twitchID === twitchID)
+      const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes) : 'No isStream record'
 
-      const { reTryInterval, maxTryTimes, stopRecordDuringReTryInterval } = recordSetting
-      const isInRetryInterval = (Date.now() - recordingUser.createdTime) > (reTryInterval * maxTryTimes)
-      const recordCondition = stopRecordDuringReTryInterval ? user && !user.isRecording && isInRetryInterval : user && !user.isRecording
-
-      if (recordCondition) {
+      if (user && !user.isRecording) {
         const { checkStreamContentType } = user
         const { isActive, targetType } = checkStreamContentType
         if (isActive && !targetType.includes(streamTypes)) {
-          helper.announcer(app.recordAction.record.stop())
+          helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
+        } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
+          helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
         } else {
           helper.announcer(app.recordAction.record.findOnlineUser(user.twitchID))
           helper.upDateIsRecording(usersData, user.twitchID, true)
           helper.upDateIsStreaming(isStreaming, user)
           // 開始錄影
+          helper.recordStream(twitchID, dirName)
         }
       }
     }
@@ -264,7 +266,50 @@ const helper = {
       createdLocalTime: new Date()
     })
     isStreaming.ids.push(userData.twitchID)
-  }
+  },
+  recordStream(twitchID, dirName) {
+    try {
+      fs.accessSync(`./recorder/${prefix}${twitchID}.bat`, fs.constants.F_OK)
+      helper.announcer(app.batchFile.isExist(twitchID))
+    } catch (error) {
+      helper.announcer(app.batchFile.isNotExist(twitchID))
+      helper.announcer(app.batchFile.created(twitchID))
+      fs.writeFileSync(`./recorder/${prefix}${twitchID}.bat`, helper.commandMaker(twitchID), (error) => {
+        console.log(error);
+      })
+    } finally {
+      helper.execFile(`${prefix}${twitchID}`, dirName)
+    }
+  },
+  commandMaker(twitchID) {
+    return `
+    @echo off\n
+    set name=${twitchID}\n
+    set url=https://www.twitch.tv/%name%\n
+    set count=0\n
+    :loop\n
+    set hour=%time:~0,2%\n
+    if "%hour:~0,1%" == " " set hour=0%hour:~1,1%\n
+    set /a count+=1\n
+    echo [CountDown] Loop for ${maxTryTimes} times, try %count% times ... \n
+    streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.mp4\n
+    if "%count%" == "${maxTryTimes}" exit\n
+    echo [CountDown] count down for ${reTryInterval} sec...\n
+    @ping 127.0.0.1 -n ${reTryInterval} -w 1000 > nul\n
+    goto loop
+    `
+  },
+  execFile(fileName, dirName) {
+    const commands = cp.exec('start ' + dirName + `\\recorder\\${fileName}.bat`, (error, stdout, stderr) => {
+      if (error) {
+        console.log(`Name: ${error.name}\nMessage: ${error.message}\nStack: ${error.stack}`)
+      }
+    })
+    process.on('exit', function () {
+      helper.announcer(app.batchFile.processKilled(fileName))
+      commands.kill()
+    })
+  },
 }
 
 module.exports = helper

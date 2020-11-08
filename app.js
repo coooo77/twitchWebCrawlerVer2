@@ -56,7 +56,7 @@ const puppeteer = require('puppeteer-core');
     await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData)
 
     // 開始錄影
-    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData)
+    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, __dirname)
 
     console.log('Done')
     // 結束前貯存isStreaming、usersData

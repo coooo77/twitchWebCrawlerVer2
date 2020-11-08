@@ -24,7 +24,8 @@ module.exports = {
     }
   },
   recordSetting: {
-    locationOfDiskWhereRecordSaved: 'D:/',
+    locationOfDiskWhereRecordSaved: 'D:\\',
+    locationOfFolderWhereRecordSaved: 'D:\\JD',
     reTryInterval: 30,
     maxTryTimes: 60,
     prefix: '',
