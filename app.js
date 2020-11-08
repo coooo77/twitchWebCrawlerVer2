@@ -1,12 +1,10 @@
-const { puppeteerSetting, url, checkDiskSpaceAction } = require('./config/config')
+const { url, checkDiskSpaceAction } = require('./config/config')
 const { login } = require('./config/domSelector')
 const { app } = require('./config/announce')
 const helper = require('./util/helper')
 require('dotenv').config()
-const puppeteer = require('puppeteer-core');
 
-(async () => {
-  const browser = await puppeteer.launch(puppeteerSetting);
+module.exports = async (browser) => {
   const page = await browser.newPage();
   try {
     await page.goto(url.twitch, { waitUntil: 'domcontentloaded' });
@@ -67,6 +65,6 @@ const puppeteer = require('puppeteer-core');
     console.error(error)
   } finally {
     await page.close();
-    await browser.close()
+    // await browser.close()
   }
-})()
+}

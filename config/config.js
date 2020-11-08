@@ -7,6 +7,7 @@ module.exports = {
   url: {
     twitch: 'https://www.twitch.tv/directory/following/live'
   },
+  checkStreamInterval: 1000 * 60,
   checkDiskSpaceAction: {
     isActive: true,
     judgeBy: {

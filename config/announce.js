@@ -77,5 +77,9 @@ module.exports = {
     initiation: 'Start input seed data to usersData...',
     initiationIsFinished: 'Seeding progress finished',
     numOfUsers: msg => `${msg} users are saved in usersData.json`
+  },
+  twitch: {
+    startToMonitor: 'Start to monitor Twitch web site ...',
+    timeAnnounce: msg => `第${msg}次執行檢查，輸入ctrl+c結束錄影 ${new Date().toLocaleString()}`
   }
 }
