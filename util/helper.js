@@ -186,9 +186,9 @@ const helper = {
     data.ids.splice(index, 1)
     data.records.splice(index, 1)
   },
-  upDateIsRecording(data, userId) {
+  upDateIsRecording(data, userId, status) {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)
-    data.records[userIndex].isRecording = false
+    data.records[userIndex].isRecording = status
   },
   async checkChannelStatus(twitchID) {
     let result
@@ -201,13 +201,13 @@ const helper = {
       return result !== 404
     }
   },
-  async checkLivingChannel(onlineStreamsData) {
+  async checkLivingChannel(onlineStreamsData, isStreaming, usersData) {
     const { livingChannel } = app.recordAction
     helper.announcer(livingChannel.checkStatus)
-    const [isStreaming, usersData] = await Promise.all([
-      helper.getJSObjData('./model/isStreaming.json'),
-      helper.getJSObjData('./model/usersData.json')
-    ])
+    // const [isStreaming, usersData] = await Promise.all([
+    //   helper.getJSObjData('./model/isStreaming.json'),
+    //   helper.getJSObjData('./model/usersData.json')
+    // ])
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
 
     if (isStreaming.ids.length !== 0) {
@@ -222,14 +222,48 @@ const helper = {
           } else {
             helper.announcer(livingChannel.userClosesStreaming(isStreaming.ids[i]))
             helper.removeRecord(isStreaming, i)
-            helper.upDateIsRecording(usersData, isStreaming.ids[i])
+            helper.upDateIsRecording(usersData, isStreaming.ids[i], false)
           }
         }
       }
-      await helper.saveJSObjData(isStreaming, 'isStreaming')
+      // await helper.saveJSObjData(isStreaming, 'isStreaming')
     } else {
       helper.announcer(livingChannel.isNoLivingChannel)
     }
+  },
+  async startToRecordStream(onlineStreamsData, isStreaming, usersData) {
+    helper.announcer(app.recordAction.record.start)
+    for (let i = 0; i < onlineStreamsData.length; i++) {
+      const { twitchID, streamTypes } = onlineStreamsData[i]
+
+      const user = usersData.records.filter(user => user.twitchID === twitchID)
+      const recordingUser = isStreaming.records.filter(user => user.twitchID === twitchID)
+
+      const { reTryInterval, maxTryTimes, stopRecordDuringReTryInterval } = recordSetting
+      const isInRetryInterval = (Date.now() - recordingUser.createdTime) > (reTryInterval * maxTryTimes)
+      const recordCondition = stopRecordDuringReTryInterval ? user && !user.isRecording && isInRetryInterval : user && !user.isRecording
+
+      if (recordCondition) {
+        const { checkStreamContentType } = user
+        const { isActive, targetType } = checkStreamContentType
+        if (isActive && !targetType.includes(streamTypes)) {
+          helper.announcer(app.recordAction.record.stop())
+        } else {
+          helper.announcer(app.recordAction.record.findOnlineUser(user.twitchID))
+          helper.upDateIsRecording(usersData, user.twitchID, true)
+          helper.upDateIsStreaming(isStreaming, user)
+          // 開始錄影
+        }
+      }
+    }
+  },
+  upDateIsStreaming(isStreaming, userData) {
+    isStreaming.records.push({
+      ...userData,
+      createdTime: Date.now(),
+      createdLocalTime: new Date()
+    })
+    isStreaming.ids.push(userData.twitchID)
   }
 }
 

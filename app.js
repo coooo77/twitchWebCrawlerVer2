@@ -49,9 +49,17 @@ const puppeteer = require('puppeteer-core');
     // console.log('onlineStreamsData', onlineStreamsData)
 
     // 檢查是否有實況主下線，是的話把isRecording改為false
-    await checkLivingChannel(onlineStreamsData)
+    const [isStreaming, usersData] = await Promise.all([
+      helper.getJSObjData('./model/isStreaming.json'),
+      helper.getJSObjData('./model/usersData.json')
+    ])
+    await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData)
+
+    // 開始錄影
+    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData)
 
     console.log('Done')
+    // 結束前貯存isStreaming、usersData
   } catch (error) {
     console.error(error)
   } finally {

@@ -26,9 +26,9 @@ module.exports = {
   recordSetting: {
     locationOfDiskWhereRecordSaved: 'D:/',
     reTryInterval: 30,
-    maxTryTimes: 120,
-    prefix: '@',
-    disableRecordAgainIfItIsRecording: true
+    maxTryTimes: 60,
+    prefix: '',
+    stopRecordDuringReTryInterval: true
   },
   loginSetting: {
     isManual: false
