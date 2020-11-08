@@ -41,7 +41,12 @@ module.exports = async (browser) => {
 
     // 開始錄影
     // await page.screenshot({ path: 'homePage.png' });
+    // ---------------------------------------------------------
+    // [TODO]:需要正確取得高度的算法
     await helper.scrollDownUntilCanNot(page)
+    await helper.wait(1000)
+    await helper.scrollDownUntilCanNot(page)
+    // ---------------------------------------------------------
     // 取得實況主英文ID與實況類型
     const onlineStreamsData = await helper.getOnlineStreamsData(page)
 

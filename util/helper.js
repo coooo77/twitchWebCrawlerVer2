@@ -184,9 +184,11 @@ const helper = {
       await helper.saveJSObjData(defaultData, fileName, fileLocation)
     }
   },
-  removeRecord(data, index) {
-    data.ids.splice(index, 1)
-    data.records.splice(index, 1)
+  removeRecord(data, twitchID) {
+    idsIndex = data.ids.findIndex(id => id === twitchID)
+    data.ids.splice(idsIndex, 1)
+    recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
+    data.records.splice(recordsIndex, 1)
   },
   upDateIsRecording(data, userId, status) {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)
@@ -210,17 +212,18 @@ const helper = {
 
     if (isStreaming.ids.length !== 0) {
       for (let i = 0; i < isStreaming.ids.length; i++) {
-        if (livingChannelList.includes(isStreaming.ids[i])) {
-          helper.announcer(livingChannel.userIsStillStreaming(isStreaming.ids[i]))
+        const targetID = isStreaming.ids[i]
+        if (livingChannelList.includes(targetID)) {
+          helper.announcer(livingChannel.userIsStillStreaming(targetID))
         } else {
           // 二次確認使用者是不是真的下線
-          const isChannelOnline = await helper.checkChannelStatus(isStreaming.ids[i])
+          const isChannelOnline = await helper.checkChannelStatus(targetID)
           if (isChannelOnline) {
-            helper.announcer(livingChannel.userIsStillStreaming(isStreaming.ids[i]))
+            helper.announcer(livingChannel.userIsStillStreaming(targetID))
           } else {
-            helper.announcer(livingChannel.userClosesStreaming(isStreaming.ids[i]))
-            helper.removeRecord(isStreaming, i)
-            helper.upDateIsRecording(usersData, isStreaming.ids[i], false)
+            helper.announcer(livingChannel.userClosesStreaming(targetID))
+            helper.removeRecord(isStreaming, targetID)
+            helper.upDateIsRecording(usersData, targetID, false)
           }
         }
       }
@@ -264,7 +267,7 @@ const helper = {
       helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
     } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
       helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
-    } else {
+    } else if (!recordingUser) {
       helper.recordStream(user, usersData, isStreaming, dirName)
     }
   },
