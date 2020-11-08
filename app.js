@@ -46,7 +46,6 @@ const puppeteer = require('puppeteer-core');
     await helper.scrollDownUntilCanNot(page)
     // 取得實況主英文ID與實況類型
     const onlineStreamsData = await helper.getOnlineStreamsData(page)
-    // console.log('onlineStreamsData', onlineStreamsData)
 
     // 檢查是否有實況主下線，是的話把isRecording改為false
     const [isStreaming, usersData] = await Promise.all([

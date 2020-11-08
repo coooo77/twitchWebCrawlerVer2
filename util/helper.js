@@ -206,10 +206,6 @@ const helper = {
   async checkLivingChannel(onlineStreamsData, isStreaming, usersData) {
     const { livingChannel } = app.recordAction
     helper.announcer(livingChannel.checkStatus)
-    // const [isStreaming, usersData] = await Promise.all([
-    //   helper.getJSObjData('./model/isStreaming.json'),
-    //   helper.getJSObjData('./model/usersData.json')
-    // ])
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
 
     if (isStreaming.ids.length !== 0) {
@@ -228,7 +224,6 @@ const helper = {
           }
         }
       }
-      // await helper.saveJSObjData(isStreaming, 'isStreaming')
     } else {
       helper.announcer(livingChannel.isNoLivingChannel)
     }
