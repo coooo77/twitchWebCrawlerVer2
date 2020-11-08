@@ -58,8 +58,12 @@ const puppeteer = require('puppeteer-core');
     // 開始錄影
     await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, __dirname)
 
-    console.log('Done')
     // 結束前貯存isStreaming、usersData
+    await Promise.all([
+      helper.saveJSObjData(isStreaming, 'isStreaming'),
+      helper.saveJSObjData(usersData, 'usersData')
+    ])
+
   } catch (error) {
     console.error(error)
   } finally {

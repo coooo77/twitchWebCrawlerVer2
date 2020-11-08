@@ -263,7 +263,7 @@ const helper = {
     isStreaming.records.push({
       ...userData,
       createdTime: Date.now(),
-      createdLocalTime: new Date()
+      createdLocalTime: new Date().toLocaleString()
     })
     isStreaming.ids.push(userData.twitchID)
   },
