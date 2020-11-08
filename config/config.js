@@ -30,7 +30,8 @@ module.exports = {
     reTryInterval: 30,
     maxTryTimes: 60,
     prefix: '',
-    stopRecordDuringReTryInterval: true
+    stopRecordDuringReTryInterval: true,
+    isRecordEveryOnlineChannel: false
   },
   loginSetting: {
     isManual: false

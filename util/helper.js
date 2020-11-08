@@ -1,7 +1,7 @@
 const readline = require('readline');
 const twitchStreams = require('twitch-get-stream')
-const { loginSetting, recordSetting, checkDiskSpaceAction } = require('../config/config')
-const { locationOfDiskWhereRecordSaved, locationOfFolderWhereRecordSaved, reTryInterval, maxTryTimes, prefix, stopRecordDuringReTryInterval } = recordSetting
+const { loginSetting, recordSetting, seedUsersDataSetting, checkDiskSpaceAction } = require('../config/config')
+const { locationOfDiskWhereRecordSaved, locationOfFolderWhereRecordSaved, reTryInterval, maxTryTimes, prefix, stopRecordDuringReTryInterval, isRecordEveryOnlineChannel } = recordSetting
 const { login, homePage } = require('../config/domSelector')
 const { app } = require('../config/announce')
 const checkDiskSpace = require('check-disk-space')
@@ -233,36 +233,62 @@ const helper = {
     for (let i = 0; i < onlineStreamsData.length; i++) {
       const { twitchID, streamTypes } = onlineStreamsData[i]
 
-      const user = usersData.records.find(user => user.twitchID === twitchID)
-      const recordingUser = isStreaming.records.find(user => user.twitchID === twitchID)
-      const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes) : 'No isStream record'
+      let user = usersData.records.find(user => user.twitchID === twitchID)
 
-      if (user && !user.isRecording) {
-        const { checkStreamContentType } = user
-        const { isActive, targetType } = checkStreamContentType
-        if (isActive && !targetType.includes(streamTypes)) {
-          helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
-        } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
-          helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
-        } else {
-          helper.announcer(app.recordAction.record.findOnlineUser(user.twitchID))
-          helper.upDateIsRecording(usersData, user.twitchID, true)
-          helper.upDateIsStreaming(isStreaming, user)
-          // 開始錄影
-          helper.recordStream(twitchID, dirName)
+      if (isRecordEveryOnlineChannel) {
+        if (!user) {
+          helper.announcer(app.noUserInfo(twitchID))
+          user = helper.addUserToUsersData(usersData, twitchID)
         }
+        if (!user.isRecording) helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
+      } else if (user && !user.isRecording) {
+        helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
       }
     }
   },
-  upDateIsStreaming(isStreaming, userData) {
-    isStreaming.records.push({
-      ...userData,
-      createdTime: Date.now(),
-      createdLocalTime: new Date().toLocaleString()
-    })
-    isStreaming.ids.push(userData.twitchID)
+  addUserToUsersData(usersData, twitchID) {
+    const user = {
+      id: usersData.records.length,
+      twitchID,
+      ...seedUsersDataSetting
+    }
+    helper.upDateJsonFile(usersData, user, 'usersData')
+    return user
   },
-  recordStream(twitchID, dirName) {
+  checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName) {
+    const recordingUser = isStreaming.records.find(user => user.twitchID === twitchID)
+    const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes) : false
+    const { checkStreamContentType } = user
+    const { isActive, targetType } = checkStreamContentType
+    if (isActive && !targetType.includes(streamTypes)) {
+      helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
+    } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
+      helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
+    } else {
+      helper.recordStream(user, usersData, isStreaming, dirName)
+    }
+  },
+  recordStream(user, usersData, isStreaming, dirName) {
+    helper.announcer(app.recordAction.record.findOnlineUser(user.twitchID))
+    helper.upDateIsRecording(usersData, user.twitchID, true)
+    helper.upDateJsonFile(isStreaming, user)
+    helper.record(user.twitchID, dirName)
+  },
+  upDateJsonFile(jsonFile, userData, file = 'isStreaming') {
+    let record
+    if (file === 'isStreaming') {
+      record = {
+        ...userData,
+        createdTime: Date.now(),
+        createdLocalTime: new Date().toLocaleString()
+      }
+    } else if (file === 'usersData') {
+      record = userData
+    }
+    jsonFile.records.push(record)
+    jsonFile.ids.push(userData.twitchID)
+  },
+  record(twitchID, dirName) {
     try {
       fs.accessSync(`./recorder/${prefix}${twitchID}.bat`, fs.constants.F_OK)
       helper.announcer(app.batchFile.isExist(twitchID))
@@ -304,7 +330,7 @@ const helper = {
       helper.announcer(app.batchFile.processKilled(fileName))
       commands.kill()
     })
-  },
+  }
 }
 
 module.exports = helper
