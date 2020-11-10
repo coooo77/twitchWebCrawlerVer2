@@ -185,11 +185,18 @@ const helper = {
     }
   },
   removeRecord(data, twitchID) {
-    // TODO 保留資料在retry範圍內不會被刪除
-    idsIndex = data.ids.findIndex(id => id === twitchID)
-    data.ids.splice(idsIndex, 1)
     recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
-    data.records.splice(recordsIndex, 1)
+    const recordTime = data.records[recordsIndex].createdTime
+    const timePassed = Date.now() - recordTime
+    const limit = reTryInterval * 1000 * maxTryTimes
+    const isInRetryInterval = (timePassed) < (limit)
+    if (!isInRetryInterval) {
+      idsIndex = data.ids.findIndex(id => id === twitchID)
+      data.ids.splice(idsIndex, 1)
+      data.records.splice(recordsIndex, 1)
+    } else {
+      helper.announcer(app.recordAction.record.isKept(userName, timePassed / 60000, limit / 60000))
+    }
   },
   upDateIsRecording(data, userId, status) {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)

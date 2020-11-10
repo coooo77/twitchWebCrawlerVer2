@@ -28,7 +28,8 @@ module.exports = {
       record: {
         start: '=> Start to check and record stream...',
         stop: (user, reason = 'type') => `Stop to record user ${user}, ${reason === 'type' ? `type of stream content isn't target type` : `stream is still in retry interval`}`,
-        findOnlineUser: user => `User ${user} is streaming, start to Record`
+        findOnlineUser: user => `User ${user} is streaming, start to Record`,
+        isKept: (user, timeNow, dueTime) => `User ${user} Record is still in retry interval, wait to delete (${timeNow.toFixed(0)} /${dueTime} mins)`
       }
     },
     upDate: {
