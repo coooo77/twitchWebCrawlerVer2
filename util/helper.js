@@ -185,6 +185,7 @@ const helper = {
     }
   },
   removeRecord(data, twitchID) {
+    // TODO 保留資料在retry範圍內不會被刪除
     idsIndex = data.ids.findIndex(id => id === twitchID)
     data.ids.splice(idsIndex, 1)
     recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
@@ -197,8 +198,7 @@ const helper = {
   async checkChannelStatus(twitchID) {
     let result
     try {
-      const response = await twitchStreams.get(twitchID)
-      result = response.length
+      await twitchStreams.get(twitchID)
     } catch (error) {
       result = error.response.status
     } finally {
@@ -209,14 +209,12 @@ const helper = {
     const { livingChannel } = app.recordAction
     helper.announcer(livingChannel.checkStatus)
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
-
     if (isStreaming.ids.length !== 0) {
-      for (let i = 0; i < isStreaming.ids.length; i++) {
+      for (let i = isStreaming.ids.length - 1; i >= 0; i--) {
         const targetID = isStreaming.ids[i]
         if (livingChannelList.includes(targetID)) {
           helper.announcer(livingChannel.userIsStillStreaming(targetID))
         } else {
-          // 二次確認使用者是不是真的下線
           const isChannelOnline = await helper.checkChannelStatus(targetID)
           if (isChannelOnline) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
@@ -260,7 +258,7 @@ const helper = {
   },
   checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName) {
     const recordingUser = isStreaming.records.find(user => user.twitchID === twitchID)
-    const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes) : false
+    const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes * 1000) : false
     const { checkStreamContentType } = user
     const { isActive, targetType } = checkStreamContentType
     if (isActive && !targetType.includes(streamTypes)) {
