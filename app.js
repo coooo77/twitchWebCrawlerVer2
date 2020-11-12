@@ -61,10 +61,10 @@ module.exports = async (browser) => {
     await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, __dirname)
 
     // 結束前貯存isStreaming、usersData
-    await Promise.all([
-      helper.saveJSObjData(isStreaming, 'isStreaming'),
-      helper.saveJSObjData(usersData, 'usersData')
-    ])
+    // await Promise.all([
+    //   helper.saveJSObjData(isStreaming, 'isStreaming'),
+    //   helper.saveJSObjData(usersData, 'usersData')
+    // ])
 
   } catch (error) {
     console.error(error)

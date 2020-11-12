@@ -184,7 +184,7 @@ const helper = {
       await helper.saveJSObjData(defaultData, fileName, fileLocation)
     }
   },
-  removeRecord(data, twitchID) {
+  async removeRecord(data, twitchID) {
     recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
     const recordTime = data.records[recordsIndex].createdTime
     const timePassed = Date.now() - recordTime
@@ -194,13 +194,15 @@ const helper = {
       idsIndex = data.ids.findIndex(id => id === twitchID)
       data.ids.splice(idsIndex, 1)
       data.records.splice(recordsIndex, 1)
+      await helper.saveJSObjData(data, 'isStreaming')
     } else {
-      helper.announcer(app.recordAction.record.isKept(userName, timePassed / 60000, limit / 60000))
+      helper.announcer(app.recordAction.record.isKept(twitchID, timePassed / 60000, limit / 60000))
     }
   },
-  upDateIsRecording(data, userId, status) {
+  async upDateIsRecording(data, userId, status) {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)
     data.records[userIndex].isRecording = status
+    await helper.saveJSObjData(data, 'usersData')
   },
   async checkChannelStatus(twitchID) {
     let result
@@ -282,7 +284,7 @@ const helper = {
     helper.upDateJsonFile(isStreaming, user)
     helper.record(user.twitchID, dirName)
   },
-  upDateJsonFile(jsonFile, userData, file = 'isStreaming') {
+  async upDateJsonFile(jsonFile, userData, file = 'isStreaming') {
     let record
     if (file === 'isStreaming') {
       record = {
@@ -295,6 +297,7 @@ const helper = {
     }
     jsonFile.records.push(record)
     jsonFile.ids.push(userData.twitchID)
+    await helper.saveJSObjData(jsonFile, file)
   },
   record(twitchID, dirName) {
     try {
