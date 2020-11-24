@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node twitch.js",
     "init": "node init.js & touch .env",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "sort": "node sorter.js"
   },
   "author": "coooo77",
   "license": "ISC",

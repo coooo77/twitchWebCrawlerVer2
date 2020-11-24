@@ -3,7 +3,7 @@ const twitchStreams = require('twitch-get-stream')
 const { loginSetting, recordSetting, seedUsersDataSetting, checkDiskSpaceAction } = require('../config/config')
 const { locationOfDiskWhereRecordSaved, locationOfFolderWhereRecordSaved, reTryInterval, maxTryTimes, prefix, stopRecordDuringReTryInterval, isRecordEveryOnlineChannel } = recordSetting
 const { login, homePage } = require('../config/domSelector')
-const { app } = require('../config/announce')
+const { app, sorter } = require('../config/announce')
 const checkDiskSpace = require('check-disk-space')
 const cp = require('child_process')
 const fs = require('fs');
@@ -341,6 +341,15 @@ const helper = {
       helper.announcer(app.batchFile.processKilled(fileName))
       commands.kill()
     })
+  },
+  arrayComparer(array, arrayCompared, arrayName, arrayComparedName) {
+    helper.announcer(sorter.arrayLength(arrayName, array.length))
+    for (element of array) {
+      if (!arrayCompared.includes(element)) {
+        helper.announcer(sorter.elementLoss(element, arrayComparedName))
+        console.log(`Can not find ${user} in ids`)
+      }
+    }
   }
 }
 
