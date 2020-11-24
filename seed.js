@@ -10,12 +10,17 @@
     helper.getJSObjData('./model/usersData.json')
   ])
 
-  const records = seedData.map((user, index) => ({
+
+  let twitchIDList = seedData.map(user => user.twitchID)
+  twitchIDList = Array.from(new Set(twitchIDList))
+  twitchIDList = twitchIDList.sort()
+
+  const records = twitchIDList.map((user, index) => ({
     id: index,
-    ...user,
+    twitchID: user,
     ...seedUsersDataSetting
   }))
-  const ids = seedData.map(user => user.twitchID)
+  const ids = twitchIDList
 
   usersData.records = records
   usersData.ids = ids
