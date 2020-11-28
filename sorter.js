@@ -18,7 +18,11 @@ ToDo:
   helper.arrayComparer(recordsList, ids, 'recordsList', 'ids')
   helper.arrayComparer(ids, recordsList, 'ids', 'recordsList')
 
-  const newRecords = records.sort((a, b) => a.twitchID > b.twitchID ? 1 : -1)
+  let newRecords = records.sort((a, b) => a.twitchID > b.twitchID ? 1 : -1)
+  newRecords = newRecords.map((user, index) => ({
+    ...user,
+    id: index
+  }))
   const newIds = newRecords.map(user => user.twitchID)
 
   usersData.records = newRecords
