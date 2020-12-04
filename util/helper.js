@@ -337,17 +337,16 @@ const helper = {
         console.log(`Name: ${error.name}\nMessage: ${error.message}\nStack: ${error.stack}`)
       }
     })
-    process.on('exit', function () {
-      helper.announcer(app.batchFile.processKilled(fileName))
-      commands.kill()
-    })
+    // process.on('exit', function () {
+    //   helper.announcer(app.batchFile.processKilled(fileName))
+    //   commands.kill()
+    // })
   },
   arrayComparer(array, arrayCompared, arrayName, arrayComparedName) {
     helper.announcer(sorter.arrayLength(arrayName, array.length))
     for (element of array) {
       if (!arrayCompared.includes(element)) {
         helper.announcer(sorter.elementLoss(element, arrayComparedName))
-        console.log(`Can not find ${user} in ids`)
       }
     }
   }

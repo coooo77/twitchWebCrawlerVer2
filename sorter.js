@@ -7,6 +7,7 @@ ToDo:
 */
 
 (async () => {
+  const { seedUsersDataSetting } = require('./config/config')
   const helper = require('./util/helper')
 
   const usersData = await helper.getJSObjData('./model/usersData.json')
@@ -18,12 +19,23 @@ ToDo:
   helper.arrayComparer(recordsList, ids, 'recordsList', 'ids')
   helper.arrayComparer(ids, recordsList, 'ids', 'recordsList')
 
-  let newRecords = records.sort((a, b) => a.twitchID > b.twitchID ? 1 : -1)
-  newRecords = newRecords.map((user, index) => ({
-    ...user,
-    id: index
-  }))
-  const newIds = newRecords.map(user => user.twitchID)
+  const newIds = Array.from(new Set(recordsList.concat(ids))).sort((a, b) => a > b ? 1 : -1)
+
+  let newRecords = newIds.map((id, index) => {
+    const user = records.find(user => user.twitchID === id)
+    if (!user) {
+      return {
+        ...seedUsersDataSetting,
+        twitchID: id,
+        id: index
+      }
+    } else {
+      return {
+        ...user,
+        id: index
+      }
+    }
+  })
 
   usersData.records = newRecords
   usersData.ids = newIds
