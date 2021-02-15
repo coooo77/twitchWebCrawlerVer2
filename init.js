@@ -3,7 +3,7 @@
   const { init } = require('./config/announce')
   const { folder, jsonFile, initiationIsFinished } = init
   const { recorder, model, seed } = folder
-  const { isStreaming, usersData, seedData } = jsonFile
+  const { isStreaming, usersData, seedData, leecher } = jsonFile
 
   const settings = {
     folder: [
@@ -38,6 +38,14 @@
         info: usersData,
         defaultData: { records: [], ids: [] },
         fileName: 'usersData',
+        fileLocation: './model/'
+      },
+      {
+        description: '建立leecher.json',
+        dataLocation: './model/leecher.json',
+        info: leecher,
+        defaultData: { "pending": [], "ready": [], "error": [] },
+        fileName: 'leecher',
         fileLocation: './model/'
       },
       {

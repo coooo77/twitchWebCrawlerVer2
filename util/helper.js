@@ -251,6 +251,8 @@ const helper = {
           user = helper.addUserToUsersData(usersData, twitchID)
         }
         if (!user.isRecording) helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
+      } if (!user.enableRecord) {
+        helper.announcer(app.userRecordDisabled(twitchID))
       } else if (user && !user.isRecording) {
         helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
       }
@@ -274,6 +276,7 @@ const helper = {
       helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
     } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
       helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
+      // 需要確認usersData是否正在錄影
     } else if (!recordingUser) {
       helper.recordStream(user, usersData, isStreaming, dirName)
     }
@@ -335,6 +338,8 @@ const helper = {
     const commands = cp.exec('start ' + dirName + `\\recorder\\${fileName}.bat`, (error, stdout, stderr) => {
       if (error) {
         console.log(`Name: ${error.name}\nMessage: ${error.message}\nStack: ${error.stack}`)
+      } else if (!error) {
+        console.log('!error', fileName)
       }
     })
     // process.on('exit', function () {

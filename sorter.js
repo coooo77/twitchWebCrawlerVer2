@@ -25,16 +25,24 @@ ToDo:
     const user = records.find(user => user.twitchID === id)
     if (!user) {
       return {
-        ...seedUsersDataSetting,
         twitchID: id,
-        id: index
+        id: index,
+        ...seedUsersDataSetting,
       }
     } else {
       return {
         ...user,
-        id: index
+        id: index,
       }
     }
+  })
+
+  newRecords = newRecords.map(record => {
+    const newRecord = Object.keys(record).sort().reduce((acc, key) => {
+      acc[key] = record[key]
+      return acc
+    }, {})
+    return newRecord
   })
 
   usersData.records = newRecords

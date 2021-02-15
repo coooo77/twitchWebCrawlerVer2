@@ -11,6 +11,7 @@ module.exports = {
     askSMSAgain: 'SMS input action fail, enter your SMS again : ',
     noDataInfo: 'Account or password missed, please fill it!',
     noUserInfo: user => `Can not find User ${user}, start to create data`,
+    userRecordDisabled: user => `User ${user} setting: enableRecord is disabled, stopping to record stream. Set it true if you want to record it.`,
     recordAction: {
       checkFreeDiskSpace: {
         info: 'Disk space monitor is active, check desk space now ...',
@@ -35,7 +36,8 @@ module.exports = {
     upDate: {
       usersData: 'Users data userData.json updated',
       seedData: 'Seed data seedData.json updated',
-      isStreaming: 'Stream record isStreaming.json updated'
+      isStreaming: 'Stream record isStreaming.json updated',
+      leecher: 'VOD recorder leecher.json updated'
     },
     batchFile: {
       isExist: twitchID => `File ${twitchID}.bat exists`,
@@ -71,7 +73,11 @@ module.exports = {
       seedData: {
         isNotExist: 'seedData.json is not exist',
         startToCreate: 'Start to create seedData.json'
-      }
+      },
+      leecher: {
+        isNotExist: 'leecher.json is not exist',
+        startToCreate: 'Start to create leecher.json'
+      },
     },
     initiationIsFinished: 'Initiation finished'
   },
