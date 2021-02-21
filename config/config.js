@@ -40,8 +40,8 @@ module.exports = {
     isManual: false
   },
   // recordVODOption: [
-  //   'manual', // 在pending.json裡面寫下Streamlink的下載程式碼，使用者自行用cmd下載
-  //   'isAutoStartRecordAfterStreamerOffLine', // 實況結束後，立刻用Streamlink讀取實況紀錄錄影(實際上會等候5分鐘，避免假的實況下線)
+  //   'manual', // 在vodRecord.json裡面寫下Streamlink的下載程式碼，使用者自行用cmd下載
+  //   'isAutoStartRecordAfterStreamerOffLine', // 實況結束後，立刻用Streamlink讀取實況紀錄錄影
   //   'countdownTimer', // 設定實況結束幾分鐘後錄製VOD
   //   'specificTimeZone' // 設定固定時間點，例如凌晨3點開始下載VOD
   // ],
