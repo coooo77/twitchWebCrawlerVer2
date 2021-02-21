@@ -11,7 +11,7 @@ module.exports = {
     askSMSAgain: 'SMS input action fail, enter your SMS again : ',
     noDataInfo: 'Account or password missed, please fill it!',
     noUserInfo: user => `Can not find User ${user}, start to create data`,
-    userRecordDisabled: user => `User ${user} setting: enableRecord is disabled, stopping to record stream. Set it true if you want to record it.`,
+    userRecordDisabled: (user, config) => `User ${user} config: ${config} is disabled, stopping to record stream. Set it true if you want to record it.`,
     recordAction: {
       checkFreeDiskSpace: {
         info: 'Disk space monitor is active, check desk space now ...',
@@ -29,15 +29,19 @@ module.exports = {
       record: {
         start: '=> Start to check and record stream...',
         stop: (user, reason = 'type') => `Stop to record user ${user}, ${reason === 'type' ? `type of stream content isn't target type` : `stream is still in retry interval`}`,
+        stopVOD: user => `User ${user} VOD type isn't target type`,
         findOnlineUser: user => `User ${user} is streaming, start to Record`,
         isKept: (user, timeNow, dueTime) => `User ${user} Record is still in retry interval, wait to delete (${timeNow.toFixed(0)} /${dueTime} mins)`
+      },
+      VOD: {
+        start: '=> start to get VOD information...'
       }
     },
     upDate: {
       usersData: 'Users data userData.json updated',
       seedData: 'Seed data seedData.json updated',
       isStreaming: 'Stream record isStreaming.json updated',
-      leecher: 'VOD recorder leecher.json updated'
+      vodRecord: 'VOD recorder vodRecord.json updated'
     },
     batchFile: {
       isExist: twitchID => `File ${twitchID}.bat exists`,
@@ -74,9 +78,9 @@ module.exports = {
         isNotExist: 'seedData.json is not exist',
         startToCreate: 'Start to create seedData.json'
       },
-      leecher: {
-        isNotExist: 'leecher.json is not exist',
-        startToCreate: 'Start to create leecher.json'
+      vodRecord: {
+        isNotExist: 'vodRecord.json is not exist',
+        startToCreate: 'Start to create vodRecord.json'
       },
     },
     initiationIsFinished: 'Initiation finished'

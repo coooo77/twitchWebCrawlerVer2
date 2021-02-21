@@ -5,20 +5,18 @@ const { announcer } = require('./util/helper')
 const app = require('./app')
 const puppeteer = require('puppeteer-core');
 
-function runningApp(count, browser) {
+let recursionTime = 1
+
+function startApp(browser) {
   return new Promise((resolve, reject) => {
     try {
-      let test = setInterval(async function () {
-        announcer(timeAnnounce(count++), 'time')
+      setTimeout(async () => {
+        announcer(timeAnnounce(recursionTime++), 'time')
         await app(browser)
-        if (count === 1000) {
-          clearInterval(test)
-          test = null
-          resolve(count)
-        }
+        resolve()
       }, checkStreamInterval)
     } catch (error) {
-      console.log(error)
+      console.error(error)
       reject()
     }
   })
@@ -26,11 +24,10 @@ function runningApp(count, browser) {
 
 (async () => {
   announcer(startToMonitor)
-  let count = 1
-  announcer(timeAnnounce(count++), 'time')
+  announcer(timeAnnounce(recursionTime++), 'time')
   const browser = await puppeteer.launch(puppeteerSetting);
   await app(browser)
   while (true) {
-    count = await runningApp(count, browser)
+    await startApp(browser)
   }
 })()

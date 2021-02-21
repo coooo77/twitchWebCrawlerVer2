@@ -5,7 +5,10 @@ module.exports = {
     userDataDir: "./userData"
   },
   url: {
-    twitch: 'https://www.twitch.tv/directory/following/live'
+    twitch: 'https://www.twitch.tv/directory/following/live',
+    test: 'https://www.twitch.tv/yueko/videos?filter=archives&sort=time',
+    baseUrl: 'https://www.twitch.tv/',
+    videos: '/videos?filter=archives&sort=time'
   },
   checkStreamInterval: 1000 * 30,
   checkDiskSpaceAction: {
@@ -48,13 +51,13 @@ module.exports = {
     enableRecordVOD: {
       isActive: false, // 啟動的話，開始檢查下列情況
       isStopRecordOnlineStream: false, // 啟動的話，禁止錄影正在實況中的實況，啟動的話，正在實況的實況會錄影，實況結束也會錄製VOD
-      mode:'isAutoStartRecordAfterStreamerOffLine',
+      mode: 'isAutoStartRecordAfterStreamerOffLine',
       countdownTimer: 60,
       specificTimeZone: {
-        hour:12,
-        minute:0,
-        second:0
-      },   
+        hour: 12,
+        minute: 0,
+        second: 0
+      },
     },
     checkStreamContentType: {
       isActive: true,

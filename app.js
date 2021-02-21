@@ -51,20 +51,22 @@ module.exports = async (browser) => {
     const onlineStreamsData = await helper.getOnlineStreamsData(page)
 
     // 檢查是否有實況主下線，是的話把isRecording改為false
-    const [isStreaming, usersData] = await Promise.all([
+    const [isStreaming, usersData, vodRecord] = await Promise.all([
       helper.getJSObjData('./model/isStreaming.json'),
-      helper.getJSObjData('./model/usersData.json')
+      helper.getJSObjData('./model/usersData.json'),
+      helper.getJSObjData('./model/vodRecord.json'),
     ])
-    await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData)
+    await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord)
 
     // 開始錄影
-    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, __dirname)
+    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, vodRecord, __dirname, page)
 
-    // 結束前貯存isStreaming、usersData
-    // await Promise.all([
-    //   helper.saveJSObjData(isStreaming, 'isStreaming'),
-    //   helper.saveJSObjData(usersData, 'usersData')
-    // ])
+
+    // 下載指定時間下載的VOD
+    if (vodRecord.queue.length !== 0) {
+      // await?
+      await helper.startToRecordVOD(vodRecord)
+    }
 
   } catch (error) {
     console.error(error)

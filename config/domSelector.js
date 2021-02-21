@@ -13,6 +13,11 @@ module.exports = {
   homePage: {
     mainBody: 'main > div.root-scrollable.scrollable-area > div.simplebar-scroll-content > div',
     scrollBody: 'main > div.root-scrollable.scrollable-area > div.simplebar-scroll-content',
-    liveCannelCard:'article > div.tw-item-order-2.tw-mg-t-1 > div > div.tw-flex-grow-1.tw-flex-shrink-1.tw-full-width.tw-item-order-2.tw-media-card-meta__text-container'
+    liveCannelCard: 'article > div.tw-item-order-2.tw-mg-t-1 > div > div.tw-flex-grow-1.tw-flex-shrink-1.tw-full-width.tw-item-order-2.tw-media-card-meta__text-container'
+  },
+  VOD: {
+    videoUrl: 'a[data-a-target="preview-card-image-link"]',
+    videoImage: 'div.preview-card-thumbnail__image > img',
+    videoCategory: 'a[data-a-target="preview-card-game-link"]'
   }
 }

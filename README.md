@@ -77,3 +77,5 @@ npm run dev
 (checkDiskSpaceAction)
 * 使用者可以針對實況者實況內容決定是否錄影
 (seedUsersDataSetting/checkStreamContentType)
+* 使用者可以設定下載VOD設定下載VOD
+(seedUsersDataSetting/enableRecordVOD)
