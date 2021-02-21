@@ -520,6 +520,8 @@ const helper = {
     for (let index = 0; index < pendingData.length; index++) {
       const { url, timeString } = pendingData[index]
       if (!url) continue
+      const isRecordExist = vodRecord.ready.some(record => record.url === url)
+      if (isRecordExist) continue
       vodRecord.ready.push({
         twitchID: targetID,
         url,
