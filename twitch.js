@@ -1,7 +1,8 @@
 const { puppeteerSetting, checkStreamInterval } = require('./config/config.js')
 const { twitch } = require('./config/announce')
 const { startToMonitor, timeAnnounce } = twitch
-const { announcer } = require('./util/helper')
+const { helper } = require('./util/helper')
+const { announcer } = helper
 const app = require('./app')
 const puppeteer = require('puppeteer-core');
 

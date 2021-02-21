@@ -1,7 +1,7 @@
 const { url, checkDiskSpaceAction } = require('./config/config')
 const { login } = require('./config/domSelector')
 const { app } = require('./config/announce')
-const helper = require('./util/helper')
+const { helper, webHandler, modelHandler, downloadHandler } = require('./util/helper')
 require('dotenv').config()
 
 module.exports = async (browser) => {
@@ -16,14 +16,14 @@ module.exports = async (browser) => {
       helper.announcer(app.startToLogin)
       // 開始登入
       const { account, password } = await helper.getAccountAndPassword()
-      await helper.login(page, account, password)
+      await webHandler.login(page, account, password)
       await helper.wait(2000)
       //驗證SMS
       const confirmSMSBtn = await page.$(login.confirmSMSBtn)
       if (confirmSMSBtn) {
-        await helper.verifySMS(page)
+        await webHandler.verifySMS(page)
       }
-      await helper.clickAndNavigate(page, login.confirmSMSBtn, 2000)
+      await webHandler.clickAndNavigate(page, login.confirmSMSBtn, 2000)
     }
 
     // 檢查硬碟空間
@@ -43,18 +43,18 @@ module.exports = async (browser) => {
     // await page.screenshot({ path: 'homePage.png' });
     // ---------------------------------------------------------
     // [TODO]:需要正確取得高度的算法
-    await helper.scrollDownUntilCanNot(page)
+    await webHandler.scrollDownUntilCanNot(page)
     await helper.wait(1000)
-    await helper.scrollDownUntilCanNot(page)
+    await webHandler.scrollDownUntilCanNot(page)
     // ---------------------------------------------------------
     // 取得實況主英文ID與實況類型
-    const onlineStreamsData = await helper.getOnlineStreamsData(page)
+    const onlineStreamsData = await webHandler.getOnlineStreamsData(page)
 
     // 檢查是否有實況主下線，是的話把isRecording改為false
     const [isStreaming, usersData, vodRecord] = await Promise.all([
-      helper.getJSObjData('./model/isStreaming.json'),
-      helper.getJSObjData('./model/usersData.json'),
-      helper.getJSObjData('./model/vodRecord.json'),
+      modelHandler.getJSObjData('./model/isStreaming.json'),
+      modelHandler.getJSObjData('./model/usersData.json'),
+      modelHandler.getJSObjData('./model/vodRecord.json'),
     ])
     await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord)
 
@@ -65,7 +65,7 @@ module.exports = async (browser) => {
     // 下載指定時間下載的VOD
     if (vodRecord.queue.length !== 0) {
       // await?
-      await helper.startToRecordVOD(vodRecord)
+      await downloadHandler.startToRecordVOD(vodRecord)
     }
 
   } catch (error) {

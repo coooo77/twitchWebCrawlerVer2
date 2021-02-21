@@ -6,18 +6,18 @@ ToDo:
 4. 對比records跟ids是否相符?
 */
 
-(async () => {
+; (async () => {
   const { seedUsersDataSetting } = require('./config/config')
-  const helper = require('./util/helper')
+  const { modelHandler } = require('./util/helper')
 
-  const usersData = await helper.getJSObjData('./model/usersData.json')
+  const usersData = await modelHandler.getJSObjData('./model/usersData.json')
 
   const { ids, records } = usersData
   const recordsList = records.map(user => user.twitchID)
 
   // 檢查records跟ids是否有互相缺失的情形
-  helper.arrayComparer(recordsList, ids, 'recordsList', 'ids')
-  helper.arrayComparer(ids, recordsList, 'ids', 'recordsList')
+  modelHandler.arrayComparer(recordsList, ids, 'recordsList', 'ids')
+  modelHandler.arrayComparer(ids, recordsList, 'ids', 'recordsList')
 
   const newIds = Array.from(new Set(recordsList.concat(ids))).sort((a, b) => a > b ? 1 : -1)
 
@@ -48,6 +48,6 @@ ToDo:
   usersData.records = newRecords
   usersData.ids = newIds
 
-  await helper.saveJSObjData(usersData)
+  await modelHandler.saveJSObjData(usersData)
   console.log('Done \u2665')
 })()

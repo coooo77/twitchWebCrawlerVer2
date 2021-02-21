@@ -1,13 +1,13 @@
 (async () => {
   const { seedUsersDataSetting } = require('./config/config')
   const { seed } = require('./config/announce')
-  const helper = require('./util/helper')
+  const { helper, modelHandler } = require('./util/helper')
 
   helper.announcer(seed.initiation)
 
   const [seedData, usersData] = await Promise.all([
-    helper.getJSObjData('./model/seed/seedData.json'),
-    helper.getJSObjData('./model/usersData.json')
+    modelHandler.getJSObjData('./model/seed/seedData.json'),
+    modelHandler.getJSObjData('./model/usersData.json')
   ])
 
 
@@ -25,7 +25,7 @@
   usersData.records = records
   usersData.ids = ids
 
-  await helper.saveJSObjData(usersData)
+  await modelHandler.saveJSObjData(usersData)
   helper.announcer(seed.numOfUsers(seedData.length))
   helper.announcer(seed.initiationIsFinished)
 })()

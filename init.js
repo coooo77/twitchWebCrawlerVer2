@@ -1,5 +1,7 @@
 (async () => {
-  const { announcer, makeDirIfNotExist, makeJsonIfNotExist } = require('./util/helper')
+  const { helper, modelHandler } = require('./util/helper')
+  const { announcer } = helper
+  const { makeDirIfNotExist, makeJsonIfNotExist } = modelHandler
   const { init } = require('./config/announce')
   const { folder, jsonFile, initiationIsFinished } = init
   const { recorder, model, seed } = folder
