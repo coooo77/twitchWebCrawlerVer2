@@ -128,8 +128,6 @@ const helper = {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
           } else {
             helper.announcer(livingChannel.userClosesStreaming(targetID))
-            await modelHandler.removeRecord(isStreaming, targetID)
-            await modelHandler.upDateIsRecording(usersData, targetID, false)
             // 下線 => 開始錄製VOD
             helper.recordVOD(usersData, targetID, vodRecord)
           }
@@ -153,14 +151,15 @@ const helper = {
         }
         if (!user.isRecording) helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
       } if (user) {
+        const { isActive, isStopRecordOnlineStream } = user.enableRecordVOD
         // 檢查是否有新的VOD可以下載
-        if (user.enableRecordVOD.isActive) {
+        if (isActive) {
           await webHandler.checkVODRecord(user, page, vodRecord)
         }
-
+        // 下載實況或VOD
         if (!user.enableRecord) {
           helper.announcer(app.userRecordDisabled(twitchID, 'enableRecord'))
-        } else if (user.enableRecordVOD.isStopRecordOnlineStream) {
+        } else if (isActive && isStopRecordOnlineStream) {
           helper.announcer(app.userRecordDisabled(twitchID, 'isStopRecordOnlineStream'))
           if (!isStreaming.ids.includes(user.twitchID)) {
             modelHandler.upDateJsonFile(isStreaming, user)
@@ -206,7 +205,7 @@ const helper = {
           const pendingRecord = vodRecord.pending[targetID]
           await modelHandler.addReadyData(vodRecord, targetID)
           for (let index = 0; index < pendingRecord.length; index++) {
-            await setTimeout(async () => await downloadHandler.downloadVOD(twitchID, record.url), 100 * (i + 1))
+            await setTimeout(async () => await downloadHandler.downloadVOD(twitchID, record.url), 100 * (index + 1))
           }
           break
         case 'countdownTimer':
@@ -246,14 +245,22 @@ const helper = {
 }
 
 const downloadHandler = {
-  execFile(fileName, dirName) {
-    cp.exec('start ' + dirName + `\\recorder\\${fileName}.bat`, (error, stdout, stderr) => {
-      if (error) {
-        console.log(`Name: ${error.name}\nMessage: ${error.message}\nStack: ${error.stack}`)
-      } else if (!error) {
-        console.log('!error', fileName)
-      }
-    })
+  async execFile(fileName, dirName, twitchID) {
+    cp.exec(
+      'start ' + dirName + `\\recorder\\${fileName}.bat`,
+      async (error, stdout, stderr) => {
+        if (!error) {
+          helper.announcer(app.recordAction.record.end(twitchID))
+          const [isStreaming, usersData] = await Promise.all([
+            modelHandler.getJSObjData('./model/isStreaming.json'),
+            modelHandler.getJSObjData('./model/usersData.json'),
+          ])
+
+          await Promise.all([
+            modelHandler.removeRecord(isStreaming, twitchID), modelHandler.upDateIsRecording(usersData, twitchID, false)
+          ])
+        }
+      })
   },
 
   commandMakerForVOD(twitchID, url, timeString) {
@@ -293,7 +300,7 @@ const downloadHandler = {
         console.log(error);
       })
     } finally {
-      downloadHandler.execFile(`${prefix}${twitchID}`, dirName)
+      downloadHandler.execFile(`${prefix}${twitchID}`, dirName, twitchID)
     }
   },
 
@@ -417,19 +424,11 @@ const modelHandler = {
   },
 
   async removeRecord(data, twitchID) {
-    recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
-    const recordTime = data.records[recordsIndex].createdTime
-    const timePassed = Date.now() - recordTime
-    const limit = reTryInterval * 1000 * maxTryTimes
-    const isInRetryInterval = (timePassed) < (limit)
-    if (!isInRetryInterval) {
-      idsIndex = data.ids.findIndex(id => id === twitchID)
-      data.ids.splice(idsIndex, 1)
-      data.records.splice(recordsIndex, 1)
-      await modelHandler.saveJSObjData(data, 'isStreaming')
-    } else {
-      helper.announcer(app.recordAction.record.isKept(twitchID, timePassed / 60000, limit / 60000))
-    }
+    const recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
+    const idsIndex = data.ids.findIndex(id => id === twitchID)
+    data.ids.splice(idsIndex, 1)
+    data.records.splice(recordsIndex, 1)
+    await modelHandler.saveJSObjData(data, 'isStreaming')
   },
 
   async upDateIsRecording(data, userId, status) {

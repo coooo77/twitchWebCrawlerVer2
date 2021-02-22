@@ -23,7 +23,7 @@ module.exports = {
         checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
-        userClosesStreaming: msg => `${msg} is offline, start to delete recording`,
+        userClosesStreaming: msg => `${msg} is offline`,
         isTargetExist: 'Check if target user exist in living channels ...'
       },
       record: {
@@ -31,7 +31,7 @@ module.exports = {
         stop: (user, reason = 'type') => `Stop to record user ${user}, ${reason === 'type' ? `type of stream content isn't target type` : `stream is still in retry interval`}`,
         stopVOD: user => `User ${user} VOD type isn't target type`,
         findOnlineUser: user => `User ${user} is streaming, start to Record`,
-        isKept: (user, timeNow, dueTime) => `User ${user} Record is still in retry interval, wait to delete (${timeNow.toFixed(0)} /${dueTime} mins)`
+        end: user => `User ${user}'s stream is closed, start to delete recording`
       },
       VOD: {
         start: '=> start to get VOD information...'
