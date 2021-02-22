@@ -126,16 +126,20 @@ const helper = {
           const isChannelOnline = await helper.checkChannelStatus(targetID)
           if (isChannelOnline) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
-            const user = usersData.records.find(user => user.twitchID === targetID)
-            if (user && !user.isRecording) {
-              modelHandler.upDateIsRecording(usersData, targetID, true)
-            }
+            // 修正錄製VOD造成使用者無法下線問題
+            // const user = usersData.records.find(user => user.twitchID === targetID)
+            // if (user && !user.isRecording) {
+            //   modelHandler.upDateIsRecording(usersData, targetID, true)
+            // }
           } else {
-            helper.announcer(livingChannel.userClosesStreaming(targetID))
-            await Promise.all([
-              modelHandler.removeRecord(isStreaming, targetID),
-              modelHandler.upDateIsRecording(usersData, targetID, false)
-            ])
+            const user = usersData.records.find(user => user.twitchID === targetID)
+            const { enableRecordVOD } = user
+            helper.announcer(livingChannel.userClosesStreaming(targetID, enableRecordVOD.isActive))
+            // 修正錄製VOD造成使用者無法下線問題
+            // await Promise.all([
+            //   modelHandler.removeRecord(isStreaming, targetID),
+            //   modelHandler.upDateIsRecording(usersData, targetID, false)
+            // ])
             // 下線 => 開始錄製VOD
             helper.recordVOD(usersData, targetID, vodRecord)
           }
@@ -346,7 +350,12 @@ const downloadHandler = {
 
     const cmd = record.cmdCommand
     await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
-      vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
+      let [isStreaming, usersData, vodRecord] = await Promise.all([
+        modelHandler.getJSObjData('./model/isStreaming.json'),
+        modelHandler.getJSObjData('./model/usersData.json'),
+        modelHandler.getJSObjData('./model/vodRecord.json'),
+      ])
+
       recordIndex = vodRecord.onGoing.findIndex(record => record.url === url)
       record = vodRecord.onGoing[recordIndex]
 
@@ -361,7 +370,12 @@ const downloadHandler = {
       }
 
       modelHandler.sterilizeVodRecord(vodRecord, targetID, url, record)
-      await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+
+      await Promise.all([
+        modelHandler.removeRecord(isStreaming, targetID),
+        modelHandler.upDateIsRecording(usersData, targetID, false),
+        modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      ])
     })
   },
 

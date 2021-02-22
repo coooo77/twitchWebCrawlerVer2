@@ -23,7 +23,7 @@ module.exports = {
         checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
-        userClosesStreaming: msg => `${msg} is offline`,
+        userClosesStreaming: (msg, isVODPending) => `${msg} is offline${isVODPending ? '' : ' and VOD pending is waiting to finished'}`,
         isTargetExist: 'Check if target user exist in living channels ...'
       },
       record: {
