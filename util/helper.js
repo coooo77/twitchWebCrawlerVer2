@@ -126,8 +126,16 @@ const helper = {
           const isChannelOnline = await helper.checkChannelStatus(targetID)
           if (isChannelOnline) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
+            const user = usersData.records.find(user => user.twitchID === targetID)
+            if (user && !user.isRecording) {
+              modelHandler.upDateIsRecording(usersData, targetID, true)
+            }
           } else {
             helper.announcer(livingChannel.userClosesStreaming(targetID))
+            await Promise.all([
+              modelHandler.removeRecord(isStreaming, targetID),
+              modelHandler.upDateIsRecording(usersData, targetID, false)
+            ])
             // 下線 => 開始錄製VOD
             helper.recordVOD(usersData, targetID, vodRecord)
           }
