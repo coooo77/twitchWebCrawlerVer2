@@ -47,20 +47,23 @@ module.exports = async (browser) => {
     await helper.wait(1000)
     await webHandler.scrollDownUntilCanNot(page)
     // ---------------------------------------------------------
-    // 取得實況主英文ID與實況類型
-    const onlineStreamsData = await webHandler.getOnlineStreamsData(page)
 
-    // 檢查是否有實況主下線，是的話把isRecording改為false
-    const [isStreaming, usersData, vodRecord] = await Promise.all([
-      modelHandler.getJSObjData('./model/isStreaming.json'),
-      modelHandler.getJSObjData('./model/usersData.json'),
-      modelHandler.getJSObjData('./model/vodRecord.json'),
+    // 取得實況主英文ID與實況類型 & 取得VOD紀錄
+    const [onlineStreamsData, vodRecord] = await Promise.all([
+      webHandler.getOnlineStreamsData(page),
+      modelHandler.getJSObjData('./model/vodRecord.json')
     ])
-    await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord)
 
-    // 開始錄影
-    await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, vodRecord, __dirname, page)
-
+    if (onlineStreamsData.length !== 0) {
+      // 檢查是否有實況主下線，是的話把isRecording改為false
+      const [isStreaming, usersData] = await Promise.all([
+        modelHandler.getJSObjData('./model/isStreaming.json'),
+        modelHandler.getJSObjData('./model/usersData.json'),
+      ])
+      await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord)
+      // 開始錄影
+      await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, vodRecord, __dirname, page)
+    }
 
     // 下載指定時間下載的VOD
     if (vodRecord.queue.length !== 0) {
