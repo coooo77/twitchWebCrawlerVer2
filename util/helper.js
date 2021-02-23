@@ -217,7 +217,7 @@ const helper = {
           const pendingRecord = vodRecord.pending[targetID]
           await modelHandler.addReadyData(vodRecord, targetID)
           for (let index = 0; index < pendingRecord.length; index++) {
-            await setTimeout(async () => await downloadHandler.downloadVOD(twitchID, record.url), 100 * (index + 1))
+            await setTimeout(async () => await downloadHandler.downloadVOD(targetID, pendingRecord[index].url), 100 * (index + 1))
           }
           break
         case 'countdownTimer':
