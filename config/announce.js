@@ -11,7 +11,7 @@ module.exports = {
     askSMSAgain: 'SMS input action fail, enter your SMS again : ',
     noDataInfo: 'Account or password missed, please fill it!',
     noUserInfo: user => `Can not find User ${user}, start to create data`,
-    userRecordDisabled: (user, config) => `User ${user} config: ${config} is disabled, stopping to record stream. Set it true if you want to record it.`,
+    userRecordDisabled: (user, config) => `User ${user} config: ${config} is active, stopping to record stream. Set it to false if you want to record it.`,
     recordAction: {
       checkFreeDiskSpace: {
         info: 'Disk space monitor is active, check desk space now ...',

@@ -113,6 +113,14 @@ const helper = {
     }
   },
 
+  checkAndCorrectUserIsRecording(usersData, targetID) {
+    // 修正錄製VOD造成使用者無法下線問題
+    const user = usersData.records.find(user => user.twitchID === targetID)
+    if (user && !user.isRecording) {
+      modelHandler.upDateIsRecording(usersData, targetID, true)
+    }
+  },
+
   async checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord) {
     const { livingChannel } = app.recordAction
     helper.announcer(livingChannel.checkStatus)
@@ -122,15 +130,12 @@ const helper = {
         const targetID = isStreaming.ids[i]
         if (livingChannelList.includes(targetID)) {
           helper.announcer(livingChannel.userIsStillStreaming(targetID))
+          helper.checkAndCorrectUserIsRecording(usersData, targetID)
         } else {
           const isChannelOnline = await helper.checkChannelStatus(targetID)
           if (isChannelOnline) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
-            // 修正錄製VOD造成使用者無法下線問題
-            const user = usersData.records.find(user => user.twitchID === targetID)
-            if (user && !user.isRecording) {
-              modelHandler.upDateIsRecording(usersData, targetID, true)
-            }
+            helper.checkAndCorrectUserIsRecording(usersData, targetID)
           } else {
             const user = usersData.records.find(user => user.twitchID === targetID)
             const { enableRecordVOD } = user
@@ -322,18 +327,27 @@ const downloadHandler = {
     @echo off\n
     set name=${twitchID}\n
     set url=https://www.twitch.tv/%name%\n
-    set count=0\n
-    :loop\n
     set hour=%time:~0,2%\n
     if "%hour:~0,1%" == " " set hour=0%hour:~1,1%\n
-    set /a count+=1\n
-    echo [CountDown] Loop for ${maxTryTimes} times, try %count% times ... \n
     streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.mp4\n
-    if "%count%" == "${maxTryTimes}" exit\n
-    echo [CountDown] count down for ${reTryInterval} sec...\n
-    @ping 127.0.0.1 -n ${reTryInterval} -w 1000 > nul\n
-    goto loop
+    exit
     `
+    // return `
+    // @echo off\n
+    // set name=${twitchID}\n
+    // set url=https://www.twitch.tv/%name%\n
+    // set count=0\n
+    // :loop\n
+    // set hour=%time:~0,2%\n
+    // if "%hour:~0,1%" == " " set hour=0%hour:~1,1%\n
+    // set /a count+=1\n
+    // echo [CountDown] Loop for ${maxTryTimes} times, try %count% times ... \n
+    // streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.mp4\n
+    // if "%count%" == "${maxTryTimes}" exit\n
+    // echo [CountDown] count down for ${reTryInterval} sec...\n
+    // @ping 127.0.0.1 -n ${reTryInterval} -w 1000 > nul\n
+    // goto loop
+    // `
   },
 
   async downloadVOD(targetID, url) {
@@ -452,14 +466,20 @@ const modelHandler = {
   async removeRecord(data, twitchID) {
     const recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
     const idsIndex = data.ids.findIndex(id => id === twitchID)
-    data.ids.splice(idsIndex, 1)
-    data.records.splice(recordsIndex, 1)
+    if (idsIndex !== -1) {
+      data.ids.splice(idsIndex, 1)
+    }
+    if (recordsIndex !== -1) {
+      data.records.splice(recordsIndex, 1)
+    }
     await modelHandler.saveJSObjData(data, 'isStreaming')
   },
 
   async upDateIsRecording(data, userId, status) {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)
-    data.records[userIndex].isRecording = status
+    if (userIndex !== -1) {
+      data.records[userIndex].isRecording = status
+    }
     await modelHandler.saveJSObjData(data, 'usersData')
   },
 
