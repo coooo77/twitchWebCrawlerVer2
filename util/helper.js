@@ -16,6 +16,7 @@ const {
   prefix,
   maxTryTimes,
   reTryInterval,
+  taskQueueConfig,
   isRecordEveryOnlineChannel,
   stopRecordDuringReTryInterval,
   locationOfDiskWhereRecordSaved,
@@ -153,6 +154,12 @@ const helper = {
     } else {
       helper.announcer(livingChannel.isNoLivingChannel)
     }
+    // 檢查VOD pending名單上的實況主是否已經下線
+    for (const twitchID in vodRecord.pending) {
+      if (!livingChannelList.includes(twitchID)) {
+        helper.recordVOD(usersData, twitchID, vodRecord)
+      }
+    }
   },
   async startToRecordStream(onlineStreamsData, isStreaming, usersData, vodRecord, dirName, page) {
     helper.announcer(app.recordAction.record.start)
@@ -162,18 +169,21 @@ const helper = {
       let user = usersData.records.find(user => user.twitchID === twitchID)
 
       if (isRecordEveryOnlineChannel) {
+        const { enableRecordVOD } = seedUsersDataSetting
         if (!user) {
           helper.announcer(app.noUserInfo(twitchID))
           user = modelHandler.addUserToUsersData(usersData, twitchID)
         }
-        if (!user.isRecording) helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
+        if (!user.isRecording && !enableRecordVOD.isStopRecordOnlineStream) {
+          helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming, dirName)
+        }
       } if (user) {
         const { isActive, isStopRecordOnlineStream } = user.enableRecordVOD
         // 檢查是否有新的VOD可以下載
         if (isActive) {
           await webHandler.checkVODRecord(user, page, vodRecord)
         }
-        // 下載實況或VOD
+        // 下載實況
         if (!user.enableRecord) {
           helper.announcer(app.userRecordDisabled(twitchID, 'enableRecord'))
         } else if (isActive && isStopRecordOnlineStream) {
@@ -226,31 +236,19 @@ const helper = {
           }
           break
         case 'countdownTimer':
-          downloadTime = (enableRecordVOD.countdownTimer * 1000 * 60) + Date.now()
+          downloadTime = helper.getCountDownTimer
           await modelHandler.addReadyData(vodRecord, targetID, downloadTime)
           break
         case 'specificTimeZone':
-          const timeNow = new Date()
-          const { hour, minute, second } = enableRecordVOD.specificTimeZone
-          downloadTime = new Date(
-            timeNow.getFullYear(),
-            timeNow.getMonth(),
-            timeNow.getDate(),
-            hour,
-            minute,
-            second
-          )
-          if (timeNow > downloadTime) {
-            downloadTime = new Date(
-              timeNow.getFullYear(),
-              timeNow.getMonth(),
-              timeNow.getDate() + 1,
-              hour,
-              minute,
-              second
-            )
-          }
+          downloadTime = helper.getSpecificTimeZone(enableRecordVOD.specificTimeZone)
           await modelHandler.addReadyData(vodRecord, targetID, Date.parse(downloadTime))
+          break
+        case 'taskQueue':
+          const { mode, countdownTimer, specificTimeZone } = taskQueueConfig
+          downloadTime = mode === 'countdownTimer'
+            ? helper.getCountDownTimer(countdownTimer)
+            : helper.getSpecificTimeZone(specificTimeZone)
+          await modelHandler.addReadyData(vodRecord, targetID, downloadTime, true)
           break
         default:
           throw new Error(`Can not find recordVOD mode config, user:${targetID}`)
@@ -258,6 +256,34 @@ const helper = {
     } else {
       return
     }
+  },
+
+  getCountDownTimer(countDownTime) {
+    return ((countDownTime * 1000 * 60) + Date.now())
+  },
+
+  getSpecificTimeZone(specificTime) {
+    const timeNow = new Date()
+    const { hour, minute, second } = specificTime
+    let downloadTime = new Date(
+      timeNow.getFullYear(),
+      timeNow.getMonth(),
+      timeNow.getDate(),
+      hour,
+      minute,
+      second
+    )
+    if (timeNow > downloadTime) {
+      downloadTime = new Date(
+        timeNow.getFullYear(),
+        timeNow.getMonth(),
+        timeNow.getDate() + 1,
+        hour,
+        minute,
+        second
+      )
+    }
+    return downloadTime
   }
 }
 
@@ -284,7 +310,7 @@ const downloadHandler = {
   commandMakerForVOD(twitchID, url, timeString) {
     if (!timeString) timeString = downloadHandler.getTimeString()
     const videoID = url.split('videos/')[1]
-    return `streamlink ${url} best -o ${locationOfFolderWhereRecordSaved}\\${prefix}${twitchID}_TwitchLive_${timeString}_ID_${videoID}.mp4`
+    return `streamlink ${url} best -o ${locationOfFolderWhereRecordSaved}\\${prefix}${twitchID}_TwitchLive_${timeString}_ID_${videoID}.ts`
   },
 
   getTimeString() {
@@ -329,7 +355,7 @@ const downloadHandler = {
     set url=https://www.twitch.tv/%name%\n
     set hour=%time:~0,2%\n
     if "%hour:~0,1%" == " " set hour=0%hour:~1,1%\n
-    streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.mp4\n
+    streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.ts\n
     exit
     `
     // return `
@@ -342,7 +368,7 @@ const downloadHandler = {
     // if "%hour:~0,1%" == " " set hour=0%hour:~1,1%\n
     // set /a count+=1\n
     // echo [CountDown] Loop for ${maxTryTimes} times, try %count% times ... \n
-    // streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.mp4\n
+    // streamlink --twitch-disable-hosting %url% best -o ${locationOfFolderWhereRecordSaved}\\${prefix}%name%_twitch_%DATE%_%hour%%time:~3,2%%time:~6,2%.ts\n
     // if "%count%" == "${maxTryTimes}" exit\n
     // echo [CountDown] count down for ${reTryInterval} sec...\n
     // @ping 127.0.0.1 -n ${reTryInterval} -w 1000 > nul\n
@@ -365,11 +391,6 @@ const downloadHandler = {
 
     const cmd = record.cmdCommand
     await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
-      // let [isStreaming, usersData, vodRecord] = await Promise.all([
-      //   modelHandler.getJSObjData('./model/isStreaming.json'),
-      //   modelHandler.getJSObjData('./model/usersData.json'),
-      //   modelHandler.getJSObjData('./model/vodRecord.json'),
-      // ])
       vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
 
       recordIndex = vodRecord.onGoing.findIndex(record => record.url === url)
@@ -389,11 +410,13 @@ const downloadHandler = {
 
       await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
 
-      // await Promise.all([
-      //   modelHandler.removeRecord(isStreaming, targetID),
-      //   modelHandler.upDateIsRecording(usersData, targetID, false),
-      //   modelHandler.saveJSObjData(vodRecord, 'vodRecord')
-      // ])
+      if (record.isTaskQueue) {
+        const anotherTaskQueueRecord = vodRecord.ready.find(record => record.isTaskQueue)
+        if (anotherTaskQueueRecord) {
+          const { twitchID, url } = anotherTaskQueueRecord
+          downloadHandler.downloadVOD(twitchID, url)
+        }
+      }
     })
   },
 
@@ -411,6 +434,8 @@ const downloadHandler = {
           const { twitchID, url } = readyArray[i]
           // 使用IIFE看看 ya3ameeb
           await setTimeout(async () => await downloadHandler.downloadVOD(twitchID, url), 100 * (i + 1))
+          // 如果是TaskQueue 只要執行一個就好
+          if (readyArray[i].isTaskQueue) break
         }
 
         // queue.splice(i, 1) //sterilizeVodRecord取代該步驟
@@ -518,7 +543,20 @@ const modelHandler = {
     }
   },
 
-  async addReadyData(vodRecord, targetID, startDownloadTime = null) {
+  async addReadyData(vodRecord, targetID, startDownloadTime = null, isTaskQueue = false) {
+    if (!isTaskQueue && startDownloadTime && !vodRecord.queue.includes(startDownloadTime)) {
+      vodRecord.queue.push(startDownloadTime)
+      vodRecord.queue.sort((a, z) => z - a)
+    } else if (isTaskQueue && startDownloadTime) {
+      // 如果是列隊式下載TaskQueue，queue的時間表應該只會放一個專屬於TaskQueue的時間
+      const isTaskQueueExistInReady = vodRecord.ready.some(record => record.isTaskQueue)
+      const isTaskQueueExistInOnGoing = vodRecord.onGoing.some(record => record.isTaskQueue)
+      if (!isTaskQueueExistInReady && !isTaskQueueExistInOnGoing) {
+        vodRecord.queue.push(startDownloadTime)
+        vodRecord.queue.sort((a, z) => z - a)
+      }
+    }
+
     const pendingData = vodRecord.pending[targetID]
     for (let index = 0; index < pendingData.length; index++) {
       const { url, timeString } = pendingData[index]
@@ -532,14 +570,10 @@ const modelHandler = {
         createdTime: Date.now(),
         createdLocalTime: new Date().toLocaleString(),
         status: 'not download yet',
+        isTaskQueue,
         startDownloadTime,
         finishedTime: null
       })
-    }
-
-    if (startDownloadTime && !vodRecord.queue.includes(startDownloadTime)) {
-      vodRecord.queue.push(startDownloadTime)
-      vodRecord.queue.sort((a, z) => z - a)
     }
 
     delete vodRecord.pending[targetID]
@@ -698,6 +732,7 @@ const webHandler = {
       const videoUrlAndCategory = await page.evaluate(selector => {
         const { videoUrl, videoCategory } = selector
         let url = document.querySelector(videoUrl)
+        if (!url) return null
         url = url.href.split('?')[0]
         let category = document.querySelector(videoCategory)
         category = category ? category.href.split('/game/')[1] : null
