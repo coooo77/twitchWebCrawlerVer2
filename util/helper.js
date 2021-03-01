@@ -584,15 +584,19 @@ const modelHandler = {
     // 檢查pending、queue是否有重複資料(需要更好的邏輯，正常是不需要做這步驟的)
     if (vodRecord.pending[targetID] && vodRecord.pending[targetID].includes(url)) {
       const urlIndex = vodRecord.pending[targetID].pending.findIndex(record => record.url === url)
-      vodRecord.pending[targetID].pending.splice(urlIndex, 1)
-      if (vodRecord[targetID].pending.length === 0) {
-        delete vodRecord.pending[targetID]
+      if (urlIndex !== -1) {
+        vodRecord.pending[targetID].pending.splice(urlIndex, 1)
+        if (vodRecord[targetID].pending.length === 0) {
+          delete vodRecord.pending[targetID]
+        }
       }
     }
 
     if (vodRecord.queue.includes(readyRecord.startDownloadTime)) {
       const urlIndex = vodRecord.queue.findIndex(time => readyRecord.startDownloadTime === time)
-      vodRecord.queue.splice(urlIndex, 1)
+      if (urlIndex !== -1) {
+        vodRecord.queue.splice(urlIndex, 1)
+      }
     }
   }
 }
