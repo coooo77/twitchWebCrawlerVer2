@@ -23,7 +23,8 @@ module.exports = {
         checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
-        userClosesStreaming: (msg, isVODPending) => `${msg} is offline${isVODPending ? ' and VOD pending is waiting to finished' : ', start to delete recording'}`,
+        checkUserStreamingStatus: (user, retryTimes) => `${user} is offline, retry ${retryTimes}/${recordSetting.maxTryTimes} times to check`,
+        userCloseStream: user => `${user} is offline, start to delete isStreaming Data`,
         isTargetExist: 'Check if target user exist in living channels ...'
       },
       record: {

@@ -138,16 +138,22 @@ const helper = {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
             helper.checkAndCorrectUserIsRecording(usersData, targetID)
           } else {
-            const user = usersData.records.find(user => user.twitchID === targetID)
-            const { enableRecordVOD } = user
-            helper.announcer(livingChannel.userClosesStreaming(targetID, enableRecordVOD.isActive))
-            // 修正錄製VOD造成使用者無法下線問題
-            await Promise.all([
-              modelHandler.removeRecord(isStreaming, targetID),
-              modelHandler.upDateIsRecording(usersData, targetID, false)
-            ])
-            // 下線 => 開始錄製VOD
-            helper.recordVOD(usersData, targetID, vodRecord)
+            const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
+            isStreaming.records[userIndex].offlineRetryTimes++
+            let { offlineRetryTimes } = isStreaming.records[userIndex]
+            if (offlineRetryTimes < recordSetting.maxTryTimes) {
+              helper.announcer(livingChannel.checkUserStreamingStatus(targetID, offlineRetryTimes))
+              await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
+            } else {
+              helper.announcer(livingChannel.userCloseStream(targetID))
+              // 修正錄製VOD造成使用者無法下線問題
+              await Promise.all([
+                modelHandler.removeRecord(isStreaming, targetID),
+                modelHandler.upDateIsRecording(usersData, targetID, false)
+              ])
+              // 下線 => 開始錄製VOD
+              helper.recordVOD(usersData, targetID, vodRecord)
+            }
           }
         }
       }
@@ -504,8 +510,8 @@ const modelHandler = {
     const userIndex = data.records.findIndex(user => user.twitchID === userId)
     if (userIndex !== -1) {
       data.records[userIndex].isRecording = status
+      await modelHandler.saveJSObjData(data, 'usersData')
     }
-    await modelHandler.saveJSObjData(data, 'usersData')
   },
 
   addUserToUsersData(usersData, twitchID) {
@@ -524,7 +530,8 @@ const modelHandler = {
       record = {
         ...userData,
         createdTime: Date.now(),
-        createdLocalTime: new Date().toLocaleString()
+        createdLocalTime: new Date().toLocaleString(),
+        offlineRetryTimes: 0
       }
     } else if (file === 'usersData') {
       record = userData

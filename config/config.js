@@ -31,13 +31,13 @@ module.exports = {
     locationOfDiskWhereRecordSaved: 'D:\\',
     locationOfFolderWhereRecordSaved: 'D:\\JD',
     reTryInterval: 30,
-    maxTryTimes: 60,
+    maxTryTimes: 5,
     prefix: '',
     stopRecordDuringReTryInterval: true,
     isRecordEveryOnlineChannel: false,
     taskQueueConfig: {
       mode: 'countdownTimer',
-      countdownTimer: 1,
+      countdownTimer: 5,
       specificTimeZone: {
         hour: 3,
         minute: 0,
