@@ -62,7 +62,7 @@ module.exports = async (browser) => {
       ])
       await helper.checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord)
       // 開始錄影
-      await helper.startToRecordStream(onlineStreamsData, isStreaming, usersData, vodRecord, __dirname, page)
+      await helper.startToRecord(onlineStreamsData, isStreaming, usersData, vodRecord, page)
     }
 
     // 下載指定時間下載的VOD
