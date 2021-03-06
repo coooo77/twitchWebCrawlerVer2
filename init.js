@@ -5,7 +5,7 @@
   const { init } = require('./config/announce')
   const { folder, jsonFile, initiationIsFinished } = init
   const { recorder, model, seed } = folder
-  const { isStreaming, usersData, seedData, vodRecord } = jsonFile
+  const { isStreaming, usersData, seedData, vodRecord, processor } = jsonFile
 
   const settings = {
     folder: [
@@ -55,6 +55,20 @@
           "queue": []
         },
         fileName: 'vodRecord',
+        fileLocation: './model/'
+      },
+      {
+        description: '建立processor.json',
+        dataLocation: './model/processor.json',
+        info: processor,
+        defaultData: {
+          "pending": {},
+          "onGoing": {},
+          "success": [],
+          "error": [],
+          "queue": {}
+        },
+        fileName: 'processor',
         fileLocation: './model/'
       },
       {

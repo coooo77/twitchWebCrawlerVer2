@@ -42,7 +42,8 @@ module.exports = {
       usersData: 'Users data userData.json updated',
       seedData: 'Seed data seedData.json updated',
       isStreaming: 'Stream record isStreaming.json updated',
-      vodRecord: 'VOD recorder vodRecord.json updated'
+      vodRecord: 'VOD recorder vodRecord.json updated',
+      processor: 'File handling record processor.json updated'
     },
     batchFile: {
       isExist: twitchID => `File ${twitchID}.bat exists`,
@@ -83,6 +84,10 @@ module.exports = {
         isNotExist: 'vodRecord.json is not exist',
         startToCreate: 'Start to create vodRecord.json'
       },
+      processor: {
+        isNotExist: 'processor.json is not exist',
+        startToCreate: 'Start to create processor.json'
+      }
     },
     initiationIsFinished: 'Initiation finished'
   },
