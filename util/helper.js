@@ -103,10 +103,10 @@ const helper = {
     return spaceLeft > number
   },
 
-  async checkChannelStatus(twitchID) {
+  async checkChannelStatus(targetID) {
     let result
     try {
-      await twitchStreams.get(twitchID)
+      await twitchStreams.get(targetID)
     } catch (error) {
       result = error.response.status
     } finally {
@@ -243,7 +243,7 @@ const helper = {
           }
           break
         case 'countdownTimer':
-          downloadTime = helper.getCountDownTimer
+          downloadTime = helper.getCountDownTimer(enableRecordVOD.countdownTimer)
           await modelHandler.addReadyData(vodRecord, targetID, downloadTime)
           break
         case 'specificTimeZone':
@@ -295,40 +295,38 @@ const helper = {
 }
 
 const downloadHandler = {
-  async execFile(cmd, twitchID, fileName) {
+  async execFile(cmd, targetID, fileName) {
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
     if (userFileHandleOption) {
       await modelHandler.updateProcessorFile('queue', targetID, null)
     }
     cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       if (!error) {
-        helper.announcer(app.recordAction.record.end(twitchID))
+        helper.announcer(app.recordAction.record.end(targetID))
         const [isStreaming, usersData] = await Promise.all([
           modelHandler.getJSObjData('./model/isStreaming.json'),
           modelHandler.getJSObjData('./model/usersData.json'),
         ])
 
         await Promise.all([
-          modelHandler.removeRecord(isStreaming, twitchID),
-          modelHandler.upDateIsRecording(usersData, twitchID, false)
+          modelHandler.removeRecord(isStreaming, targetID),
+          modelHandler.upDateIsRecording(usersData, targetID, false)
         ])
 
-        await fileHandler.upDateProcessorData(fileName, twitchID)
+        await fileHandler.upDateProcessorData(fileName, targetID)
       }
     })
   },
 
   /**
    * 製作實況下載的cmd指令內容
-   * @param {string} twitchID 實況者ID
+   * @param {string} targetID 實況者ID
    * @param {string} fileName 下載時況檔案的檔案名稱
    * @returns {string} cmd指令內容
    */
-  commandMaker(twitchID, fileName) {
-    const streamUrl = `https://www.twitch.tv/${twitchID}`
-    return `
-    streamlink --twitch-disable-hosting ${streamUrl} best -o ${locationOfFolderWhereRecordSaved}\\${fileName}
-    `
+  commandMaker(targetID, fileName) {
+    const streamUrl = `https://www.twitch.tv/${targetID}`
+    return `streamlink --twitch-disable-hosting ${streamUrl} best -o ${locationOfFolderWhereRecordSaved}\\${fileName}`
   },
 
   commandMakerForVOD(url, fileName) {
@@ -337,16 +335,16 @@ const downloadHandler = {
 
   /**
    * 取得影片檔案名稱
-   * @param {string} twitchID 實況者ID
+   * @param {string} targetID 實況者ID
    * @param {string} videoID VOD影片ID
    * @param {string} timeString 影片下載的時間
    */
-  getFileName(twitchID, videoID = null, timeString = null) {
+  getFileName(targetID, videoID = null, timeString = null) {
     if (!timeString) timeString = downloadHandler.getTimeString()
 
     return videoID
-      ? `${prefix}${twitchID}_TwitchLive_${timeString}_ID_${videoID}.ts`
-      : `${prefix}${twitchID}_twitch_${timeString}.ts`
+      ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}.ts`
+      : `${prefix}${targetID}_twitch_${timeString}.ts`
   },
 
   getTimeString() {
@@ -369,10 +367,10 @@ const downloadHandler = {
     return `${year}_${month}_${date}_${hour}${minute}${second}`
   },
 
-  async recordStream(twitchID) {
-    const fileName = downloadHandler.getFileName(twitchID)
-    const cmd = downloadHandler.commandMaker(twitchID, fileName)
-    await downloadHandler.execFile(cmd, twitchID, fileName)
+  async recordStream(targetID) {
+    const fileName = downloadHandler.getFileName(targetID)
+    const cmd = downloadHandler.commandMaker(targetID, fileName)
+    await downloadHandler.execFile(cmd, targetID, fileName)
   },
 
   async beforeDownloadVOD(targetID, url) {
@@ -406,7 +404,17 @@ const downloadHandler = {
 
     modelHandler.sterilizeVodRecord(vodRecord, targetID, url, record)
 
+    await fileHandler.upDateProcessorData(record.fileName, targetID)
+
     await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+
+    if (record.isTaskQueue) {
+      const anotherTaskQueueRecord = vodRecord.ready.find(record => record.isTaskQueue)
+      if (anotherTaskQueueRecord) {
+        const { twitchID, url } = anotherTaskQueueRecord
+        downloadHandler.downloadVOD(twitchID, url)
+      }
+    }
   },
 
   async downloadVOD(targetID, url) {
@@ -420,16 +428,6 @@ const downloadHandler = {
 
     await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       await downloadHandler.afterDownloadVOD(targetID, url, error)
-
-      await fileHandler.upDateProcessorData(record.fileName, targetID)
-
-      if (record.isTaskQueue) {
-        const anotherTaskQueueRecord = vodRecord.ready.find(record => record.isTaskQueue)
-        if (anotherTaskQueueRecord) {
-          const { twitchID, url } = anotherTaskQueueRecord
-          downloadHandler.downloadVOD(twitchID, url)
-        }
-      }
     })
   },
 
@@ -501,9 +499,9 @@ const modelHandler = {
     }
   },
 
-  async removeRecord(data, twitchID) {
-    const recordsIndex = data.records.findIndex(record => record.twitchID === twitchID)
-    const idsIndex = data.ids.findIndex(id => id === twitchID)
+  async removeRecord(data, targetID) {
+    const recordsIndex = data.records.findIndex(record => record.twitchID === targetID)
+    const idsIndex = data.ids.findIndex(id => id === targetID)
     if (idsIndex !== -1) {
       data.ids.splice(idsIndex, 1)
     }
@@ -521,10 +519,10 @@ const modelHandler = {
     }
   },
 
-  addUserToUsersData(usersData, twitchID) {
+  addUserToUsersData(usersData, targetID) {
     const user = {
       id: usersData.records.length,
-      twitchID,
+      targetID,
       ...seedUsersDataSetting
     }
     modelHandler.upDateJsonFile(usersData, user, 'usersData')
@@ -620,19 +618,19 @@ const modelHandler = {
   /**
  * 把實況結束的紀錄存到processor.json中
  * @param {string} keyName queue, onGoing, success, error, queue
- * @param {string} twitchID 實況者ID
+ * @param {string} targetID 實況者ID
  * @param {any} payload 要存的資料
  */
-  async updateProcessorFile(keyName, twitchID, payload) {
+  async updateProcessorFile(keyName, targetID, payload) {
     const processorFile = await modelHandler.getJSObjData('./model/processor.json')
     try {
       if (!(keyName in processorFile)) throw new Error('Invalid key name')
       if (Array.isArray(processorFile[keyName])) {
         processorFile[keyName].push(payload)
       } else {
-        processorFile[keyName][twitchID] = payload
+        processorFile[keyName][targetID] = payload
       }
-      await modelHandler.saveJSObjData(processorFile, 'processorFile')
+      await modelHandler.saveJSObjData(processorFile, 'processor')
     } catch (error) {
       console.error(error)
     }
@@ -791,15 +789,15 @@ const fileHandler = {
   /**
    * 在queue加入實況者影片下載完的時間(+1小時)
    * @param {object} processorFile processor.json的資料
-   * @param {String} twitchID 實況者ID
+   * @param {String} targetID 實況者ID
    * @param {number} timeToHandle 檔案開始處理的時間
    */
-  async addTimeToQueue(processorFile, twitchID, timeToHandle = null) {
+  async addTimeToQueue(processorFile, targetID, timeToHandle = null) {
     if (!timeToHandle) {
       const timeNow = Date.now()
       timeToHandle = timeNow + 1000 * 60 * 60
     }
-    processorFile.queue[twitchID] = new Date(timeToHandle)
+    processorFile.queue[targetID] = new Date(timeToHandle)
   },
 
   /**
@@ -846,15 +844,16 @@ const fileHandler = {
   getParseTime(options, target) {
     // const timeNow = new Date()
 
-    let found = null
-    let [hour, minute] = [0, 0]
+    let found = null, hour = 0, minute = 0
     if (target === 'from') {
       found = options.match(/from:\d{4}/)
-      let [hour, minute] = [0, 0]
+      hour = 0
+      minute = 0
       // timeNow.setHours(0, 0)
     } else if (target === 'to') {
       found = options.match(/to:\d{4}/)
-      let [hour, minute] = [23, 59]
+      hour = 23
+      minute = 59
       // timeNow.setHours(23, 59)
     }
 
@@ -914,14 +913,17 @@ const fileHandler = {
 
       fileHandler.addTimeToQueue(processorFile, targetID)
 
-      if (targetID in processorFile[pending]) {
+      if (targetID in processorFile.pending) {
         processorFile.pending[targetID].fileNames.push(fileName)
       } else {
-        processorFile.pending[targetID].fileNames = [fileName]
+        processorFile.pending[targetID] = {
+          fileNames: [fileName],
+          processOption: {}
+        }
       }
       processorFile.pending[targetID].processOption = processOption
 
-      await modelHandler.saveJSObjData(processorFile, 'processorFile')
+      await modelHandler.saveJSObjData(processorFile, 'processor')
     }
   }
 }

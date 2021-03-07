@@ -37,7 +37,7 @@ module.exports = {
     isRecordEveryOnlineChannel: false,
     taskQueueConfig: {
       mode: 'countdownTimer',
-      countdownTimer: 5,
+      countdownTimer: 1,
       specificTimeZone: {
         hour: 3,
         minute: 0,
@@ -76,7 +76,8 @@ module.exports = {
     checkStreamContentType: {
       isActive: true,
       targetType: ['Art', 'Just%20Chatting']
-    }
+    },
+    fileHandleOption: 'keep mute compress combine from:0000 to:2359 screenshot:70_80_90'
   }
 }
 
