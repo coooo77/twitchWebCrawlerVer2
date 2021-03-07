@@ -296,7 +296,10 @@ const helper = {
 
 const downloadHandler = {
   async execFile(cmd, twitchID, fileName) {
-    await modelHandler.updateProcessorFile('queue', twitchID, null)
+    const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
+    if (userFileHandleOption) {
+      await modelHandler.updateProcessorFile('queue', targetID, null)
+    }
     cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       if (!error) {
         helper.announcer(app.recordAction.record.end(twitchID))
@@ -410,7 +413,10 @@ const downloadHandler = {
     if (!url) return
     const cmd = await downloadHandler.beforeDownloadVOD(targetID, url)
 
-    await modelHandler.updateProcessorFile('queue', targetID, null)
+    const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
+    if (userFileHandleOption) {
+      await modelHandler.updateProcessorFile('queue', targetID, null)
+    }
 
     await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       await downloadHandler.afterDownloadVOD(targetID, url, error)
