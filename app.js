@@ -41,12 +41,17 @@ module.exports = async (browser) => {
 
     // 開始錄影
     // await page.screenshot({ path: 'homePage.png' });
-    // ---------------------------------------------------------
-    // [TODO]:需要正確取得高度的算法
-    await webHandler.scrollDownUntilCanNot(page)
-    await helper.wait(1000)
-    await webHandler.scrollDownUntilCanNot(page)
-    // ---------------------------------------------------------
+    let height = 0
+    while (true) {
+      await webHandler.scrollDownUntilCanNot(page)
+      await helper.wait(1000)
+      const currentHeight = await webHandler.measureHeight(page)
+      if (height !== currentHeight) {
+        height = currentHeight
+      } else {
+        break
+      }
+    }
 
     // 取得實況主英文ID與實況類型 & 取得VOD紀錄
     const [onlineStreamsData, vodRecord] = await Promise.all([
