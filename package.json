@@ -14,6 +14,7 @@
   "dependencies": {
     "check-disk-space": "^2.1.0",
     "dotenv": "^8.2.0",
+    "fluent-ffmpeg": "^2.1.2",
     "puppeteer-core": "^5.4.1",
     "twitch-get-stream": "^0.6.0"
   }
