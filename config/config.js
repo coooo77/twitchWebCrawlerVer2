@@ -1,4 +1,4 @@
-module.exports = {
+const config = {
   puppeteerSetting: {
     executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     headless: true,
@@ -34,7 +34,7 @@ module.exports = {
     maxTryTimes: 5,
     prefix: '',
     stopRecordDuringReTryInterval: true,
-    isRecordEveryOnlineChannel: false,
+    isRecordEveryOnlineChannel: true,
     taskQueueConfig: {
       mode: 'countdownTimer',
       countdownTimer: 1,
@@ -44,6 +44,29 @@ module.exports = {
         second: 0
       },
     }
+  },
+  processSetting: {
+    fileLocation: {
+      /**
+       * 沒有設定的話，會在爬蟲的資料夾建立資料夾
+       */
+      origin: 'D:\\JD', // 必填
+      processing: 'D:\\JD\\processing',
+      processed: 'D:\\JD\\processed',
+      defaultPath: {
+        processRoot: 'process',
+        processing: 'processing',
+        processed: 'processed'
+      }
+    },
+    suffix: {
+      mute: 'mute',
+      compress: 'convert',
+      combined: 'combined'
+    },
+    ffmpegPath: 'D:\\ffmpeg\\bin\\ffmpeg.exe',
+    probePath: 'D:\\ffmpeg\\bin\\ffprobe.exe',
+    minutesToDelay: 30 * 60 * 1000
   },
   loginSetting: {
     isManual: false
@@ -74,13 +97,14 @@ module.exports = {
       },
     },
     checkStreamContentType: {
-      isActive: true,
+      isActive: false,
       targetType: ['Art', 'Just%20Chatting']
     },
     fileHandleOption: 'keep mute compress combine from:0000 to:2359 screenshot:70_80_90'
   }
 }
 
+module.exports = config
 // Mega Byte(MB)
 // Giga Byte(GB)
 // Tera Byte(TB)

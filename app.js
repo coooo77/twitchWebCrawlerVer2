@@ -1,7 +1,7 @@
 const { url, checkDiskSpaceAction } = require('./config/config')
 const { login } = require('./config/domSelector')
 const { app } = require('./config/announce')
-const { helper, webHandler, modelHandler, downloadHandler } = require('./util/helper')
+const { helper, webHandler, modelHandler, downloadHandler, fileHandler } = require('./util/helper')
 require('dotenv').config()
 
 module.exports = async (browser) => {
@@ -54,9 +54,10 @@ module.exports = async (browser) => {
     }
 
     // 取得實況主英文ID與實況類型 & 取得VOD紀錄
-    const [onlineStreamsData, vodRecord] = await Promise.all([
+    const [onlineStreamsData, vodRecord, processor] = await Promise.all([
       webHandler.getOnlineStreamsData(page),
-      modelHandler.getJSObjData('./model/vodRecord.json')
+      modelHandler.getJSObjData('./model/vodRecord.json'),
+      modelHandler.getJSObjData('./model/processor.json'),
     ])
 
     if (onlineStreamsData.length !== 0) {
@@ -74,6 +75,12 @@ module.exports = async (browser) => {
     if (vodRecord.queue.length !== 0) {
       // await?
       await downloadHandler.startToRecordVOD(vodRecord)
+    }
+
+    // 檔案處理
+    const processorQueue = Object.keys(processor.queue)
+    if (processorQueue.length !== 0) {
+      await fileHandler.checkIsFileNeedToProcess(processor, processorQueue)
     }
 
   } catch (error) {

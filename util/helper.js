@@ -3,11 +3,13 @@ const cp = require('child_process');
 const readline = require('readline');
 const twitchStreams = require('twitch-get-stream')
 const checkDiskSpace = require('check-disk-space')
+const videoHandler = require('./videoHandler')
 
 const {
   url,
   loginSetting,
   recordSetting,
+  processSetting,
   seedUsersDataSetting,
   checkDiskSpaceAction,
 } = require('../config/config');
@@ -23,6 +25,10 @@ const {
   locationOfFolderWhereRecordSaved,
 } = recordSetting
 
+const {
+  minutesToDelay
+} = processSetting
+
 const { app, sorter } = require('../config/announce');
 const { login, homePage, VOD } = require('../config/domSelector');
 
@@ -31,6 +37,11 @@ const helper = {
   wait(ms) {
     return new Promise(resolve => setTimeout(() => resolve(), ms))
   },
+  /**
+   * 列印指定的訊息
+   * @param {sting} message 訊息內容
+   * @param {sting} type system | warn | time | mode
+   */
   announcer(message, type = 'system') {
     if (type === 'system') {
       console.log(`[SYSTEM] ${message}`)
@@ -129,33 +140,40 @@ const helper = {
     if (isStreaming.ids.length !== 0) {
       for (let i = isStreaming.ids.length - 1; i >= 0; i--) {
         const targetID = isStreaming.ids[i]
-        if (livingChannelList.includes(targetID)) {
-          helper.announcer(livingChannel.userIsStillStreaming(targetID))
-          helper.checkAndCorrectUserIsRecording(usersData, targetID)
-        } else {
-          const isChannelOnline = await helper.checkChannelStatus(targetID)
-          if (isChannelOnline) {
+        if (targetID) {
+          if (livingChannelList.includes(targetID)) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
             helper.checkAndCorrectUserIsRecording(usersData, targetID)
           } else {
-            const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
-            isStreaming.records[userIndex].offlineRetryTimes++
-            let { offlineRetryTimes } = isStreaming.records[userIndex]
-            if (offlineRetryTimes < recordSetting.maxTryTimes) {
-              helper.announcer(livingChannel.checkUserStreamingStatus(targetID, offlineRetryTimes))
-              await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
+            const isChannelOnline = await helper.checkChannelStatus(targetID)
+            if (isChannelOnline) {
+              helper.announcer(livingChannel.userIsStillStreaming(targetID))
+              helper.checkAndCorrectUserIsRecording(usersData, targetID)
             } else {
-              helper.announcer(livingChannel.userCloseStream(targetID))
-              // 修正錄製VOD造成使用者無法下線問題
-              await Promise.all([
-                modelHandler.removeRecord(isStreaming, targetID),
-                modelHandler.upDateIsRecording(usersData, targetID, false)
-              ])
-              // 下線 => 開始錄製VOD
-              helper.recordVOD(usersData, targetID, vodRecord)
+              const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
+              const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
+              if (!(isActive && isStopRecordOnlineStream)) {
+                // 非下載VOD的實況類型，一律以cmd來判斷下線
+                helper.announcer(livingChannel.inValidOffline(targetID))
+              } else {
+                /*
+                TOD 
+                VOD的實況類型用下線次數來判斷(或者用爬蟲)
+                要更新檢查資料的時間，以key來標記ID，value為時間
+                */
+                helper.announcer(livingChannel.userCloseStream(targetID))
+                // 修正錄製VOD造成使用者無法下線問題
+                await Promise.all([
+                  modelHandler.removeRecord(isStreaming, targetID),
+                  modelHandler.upDateIsRecording(usersData, targetID, false)
+                ])
+                // 下線 => 開始錄製VOD
+                helper.recordVOD(usersData, targetID, vodRecord)
+              }
             }
           }
         }
+
       }
     } else {
       helper.announcer(livingChannel.isNoLivingChannel)
@@ -181,7 +199,9 @@ const helper = {
           user = modelHandler.addUserToUsersData(usersData, twitchID)
         }
         if (!user.isRecording && !enableRecordVOD.isStopRecordOnlineStream) {
+          console.log('user ===========================>', user)
           helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming)
+          break
         }
       } if (user) {
         const { isActive, isStopRecordOnlineStream } = user.enableRecordVOD
@@ -206,17 +226,15 @@ const helper = {
 
   checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming) {
     const recordingUser = isStreaming.records.find(user => user.twitchID === twitchID)
-    const isInRetryInterval = recordingUser ? (Date.now() - recordingUser.createdTime) < (reTryInterval * maxTryTimes * 1000) : false
-    const { checkStreamContentType } = user
-    const { isActive, targetType } = checkStreamContentType
-    if (isActive && !targetType.includes(streamTypes)) {
-      helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
-    } else if (stopRecordDuringReTryInterval && recordingUser && isInRetryInterval) {
-      helper.announcer(app.recordAction.record.stop(twitchID, 'interval'))
-      // 需要確認usersData是否正在錄影
-    } else if (!recordingUser) {
-      helper.startToRecordStream(user, usersData, isStreaming)
+    if (!recordingUser) {
+      const { isActive, targetType } = user.checkStreamContentType
+      if (isActive && !targetType.includes(streamTypes)) {
+        helper.announcer(app.recordAction.record.stop(twitchID, 'type'))
+      } else {
+        helper.startToRecordStream(user, usersData, isStreaming)
+      }
     }
+
   },
 
   startToRecordStream(user, usersData, isStreaming) {
@@ -295,11 +313,11 @@ const helper = {
 }
 
 const downloadHandler = {
+
+
   async execFile(cmd, targetID, fileName) {
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
-    if (userFileHandleOption) {
-      await modelHandler.updateProcessorFile('queue', targetID, null)
-    }
+    const preTime = await fileHandler.delayProcessTime(userFileHandleOption, targetID)
     cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       if (!error) {
         helper.announcer(app.recordAction.record.end(targetID))
@@ -312,8 +330,7 @@ const downloadHandler = {
           modelHandler.removeRecord(isStreaming, targetID),
           modelHandler.upDateIsRecording(usersData, targetID, false)
         ])
-
-        await fileHandler.upDateProcessorData(fileName, targetID)
+        await fileHandler.upDateProcessorData(fileName, targetID, preTime)
       }
     })
   },
@@ -402,9 +419,12 @@ const downloadHandler = {
       vodRecord.success.push(record)
     }
 
+    const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
+    const preTime = await fileHandler.delayProcessTime(userFileHandleOption, targetID)
+
     modelHandler.sterilizeVodRecord(vodRecord, targetID, url, record)
 
-    await fileHandler.upDateProcessorData(record.fileName, targetID)
+    await fileHandler.upDateProcessorData(record.fileName, targetID, preTime)
 
     await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
 
@@ -485,7 +505,7 @@ const modelHandler = {
   makeDirIfNotExist(info, location) {
     if (!fs.existsSync(location)) {
       helper.announcer(info.isNotExist)
-      helper.announcer(info.startToCreateDirectory)
+      helper.announcer(info.startToCreateFolder)
       fs.mkdirSync(location)
     }
   },
@@ -522,7 +542,7 @@ const modelHandler = {
   addUserToUsersData(usersData, targetID) {
     const user = {
       id: usersData.records.length,
-      targetID,
+      twitchID: targetID,
       ...seedUsersDataSetting
     }
     modelHandler.upDateJsonFile(usersData, user, 'usersData')
@@ -535,8 +555,7 @@ const modelHandler = {
       record = {
         ...userData,
         createdTime: Date.now(),
-        createdLocalTime: new Date().toLocaleString(),
-        offlineRetryTimes: 0
+        createdLocalTime: new Date().toLocaleString()
       }
     } else if (file === 'usersData') {
       record = userData
@@ -785,7 +804,6 @@ const webHandler = {
 }
 
 const fileHandler = {
-
   /**
    * 在queue加入實況者影片下載完的時間(+1小時)
    * @param {object} processorFile processor.json的資料
@@ -795,7 +813,8 @@ const fileHandler = {
   async addTimeToQueue(processorFile, targetID, timeToHandle = null) {
     if (!timeToHandle) {
       const timeNow = Date.now()
-      timeToHandle = timeNow + 1000 * 60 * 60
+      // timeToHandle = timeNow + 1000 * 60 * 60
+      timeToHandle = timeNow + 1000 * 60 * 2
     }
     processorFile.queue[targetID] = new Date(timeToHandle)
   },
@@ -889,48 +908,176 @@ const fileHandler = {
   },
 
   /**
+   * 檢查是否指定的檔案存在
+   * @param {string} fileName 檔名
+   * @param {string} path 檔案位置
+   * @returns {boolean} 檔案是否存在
+   */
+  checkIsFileExist(fileName, path) {
+    const filePath = `${path}\\${fileName}`
+    return fs.existsSync(filePath)
+  },
+
+  /**
    * 影片下載結束，讀取影片處理設定、解析
    * @param {string} fileName 要紀錄的檔案名稱
    * @param {string} targetID 實況者ID
+   * @param {string} preTime 前一筆影片處理時間
    */
-  async upDateProcessorData(fileName, targetID) {
-    const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
-
-    if (userFileHandleOption) {
+  async upDateProcessorData(fileName, targetID, preTime) {
+    // 確認有該檔案才進行處理
+    const isFileExist = fileHandler.checkIsFileExist(fileName, locationOfFolderWhereRecordSaved)
+    console.log('upDateProcessorData', fileName, 'isFileExist', isFileExist)
+    if (!isFileExist) {
+      // 沒有該檔案，而且有前一筆影片處理時間 => 恢復上一筆處理時間
       const processorFile = await modelHandler.getJSObjData('./model/processor.json')
-
-      const processOption = fileHandler.parseUserFileHandleOption(userFileHandleOption)
-
-      // 更新時間
-      // const timeNow = new Date()
-      // const { validProcessPeriod } = processOption
-      // const { from, to } = validProcessPeriod
-      // if (!(from <= timeNow && timeNow <= to)) {
-      //   const timeDate = timeNow.getDay()
-      //   processOption.validProcessPeriod.from = from.setDate(timeDate + 1)
-      //   processOption.validProcessPeriod.to = to.setDate(timeDate + 1)
-      // }
-
-      fileHandler.addTimeToQueue(processorFile, targetID)
-
-      if (targetID in processorFile.pending) {
-        processorFile.pending[targetID].fileNames.push(fileName)
-      } else {
-        processorFile.pending[targetID] = {
-          fileNames: [fileName],
-          processOption: {}
-        }
+      if (processorFile.queue[targetID] === null && preTime) {
+        processorFile.queue[targetID] = preTime
+        await modelHandler.saveJSObjData(processorFile, 'processor')
       }
-      processorFile.pending[targetID].processOption = processOption
+    } else {
+      const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
+      if (userFileHandleOption) {
+        const processorFile = await modelHandler.getJSObjData('./model/processor.json')
+        const processOption = fileHandler.parseUserFileHandleOption(userFileHandleOption)
+        fileHandler.addTimeToQueue(processorFile, targetID)
+        if (targetID in processorFile.pending) {
+          processorFile.pending[targetID].fileNames.push(fileName)
+        } else {
+          processorFile.pending[targetID] = {
+            fileNames: [fileName],
+            processOption: {}
+          }
+        }
+        processorFile.pending[targetID].processOption = processOption
 
-      await modelHandler.saveJSObjData(processorFile, 'processor')
+        await modelHandler.saveJSObjData(processorFile, 'processor')
+      }
     }
+
+
+  },
+
+  /**
+   * 檢查是否有影片已經到了可以處理的時間
+   * @param {object} processorFile processor.json的資料
+   * @param {string[]} processorQueue queue的key，以string表示
+   */
+  checkIsFileNeedToProcess(processorFile, processorQueue) {
+    const timeNow = new Date()
+    const { queue } = processorFile
+    for (const twitchID of processorQueue) {
+      console.log('queue[twitchID]', queue[twitchID])
+      console.log(new Date(queue[twitchID]).toLocaleString())
+      if (queue[twitchID] === null) continue
+      const timeToCheck = new Date(queue[twitchID])
+      console.log('timeNow >= timeToCheck', timeNow >= timeToCheck)
+      if (timeNow >= timeToCheck) {
+        fileHandler.checkFileTimeRange(processorFile, twitchID, timeNow)
+      }
+    }
+  },
+
+  /**
+   * 檢查檔案是否在指定的時間內
+   * 如果小於這個範圍就繼續等
+   * 如果大於就讓指定範圍往後延一天
+   * 如果在這範圍就開始處理檔案
+   * @param {object} processorFile processor.json的資料
+   * @param {string} targetID 實況者ID
+   * @param {Date} currentTime 現在的時間
+   */
+  async checkFileTimeRange(processorFile, targetID, currentTime) {
+    const userFileHandleData = processorFile.pending[targetID]
+    const { from, to } = userFileHandleData.processOption.validProcessPeriod
+    const fromTime = new Date().setHours(from.hour, from.minute)
+    const toTime = new Date().setHours(to.hour, to.minute)
+    if (toTime < currentTime) {
+      await fileHandler.delayProcessFileFor1Day(processorFile, targetID)
+    } else if (fromTime <= currentTime <= toTime) {
+      // 開始處理檔案
+      await fileHandler.startToProcessFile(processorFile, targetID)
+    }
+  },
+
+  /**
+   * 檢查onGoing是否有正在處裡的檔案，，沒有就開始處理，有的話救延後minutesToDelay(預設30分)
+   * @param {object} processorFile processor.json的資料
+   * @param {string} targetID 實況者ID
+   */
+  async startToProcessFile(processorFile, targetID) {
+    const { onGoing } = processorFile
+    const onGoingContent = Object.keys(onGoing)
+    if (onGoingContent.length !== 0) {
+      helper.announcer(app.processAction.isStopped(minutesToDelay))
+      const delayTime = Date.now() + minutesToDelay
+      await modelHandler.updateProcessorFile('queue', targetID, new Date(delayTime))
+    } else {
+      await fileHandler.handleProcessFile(processorFile, targetID)
+    }
+  },
+
+  /**
+   * 開始進行處裡影片檔案
+   * @param {object} processorFile processor.json的資料
+   * @param {string} targetID 實況者ID
+   */
+  async handleProcessFile(processorFile, targetID) {
+    // 更新processor資料狀態，移動到onGoing
+    const targetFileData = processorFile.pending[targetID]
+    delete processorFile.pending[targetID]
+    delete processorFile.queue[targetID]
+    processorFile.onGoing[targetID] = targetFileData
+    console.log('DELETE pending, queue', processorFile)
+    await modelHandler.saveJSObjData(processorFile, 'processor')
+    // 沒有資料夾就建立一個
+
+    helper.announcer(app.processAction.isStart(targetID))
+
+
+    // const { processOption } = targetFileData
+    console.log('videoHandler.mainProgram')
+    videoHandler.mainProgram(targetFileData, targetID)
+  },
+
+  /**
+   * 延後資料處理一天
+   * @param {object} processorFile processor.json的資料
+   * @param {string} targetID 實況者ID
+   */
+  async delayProcessFileFor1Day(processorFile, targetID) {
+    const delayTime = new Date(processorFile.queue[targetID])
+    const delayTimeDate = delayTime.getDate()
+    delayTime.setDate(delayTimeDate + 1)
+    processorFile.queue[targetID] = delayTime
+    await modelHandler.saveJSObjData(processorFile, 'processor')
+  },
+
+  /**
+   * 當有新的下載，把影片處理時間改為null，延後處理時間
+   * @param {object} userFileHandleOption 使用者處理檔案選項
+   * @param {object} targetID 實況者ID
+   * @returns {string} preTime 上一個檔案的處理時間
+   */
+  async delayProcessTime(userFileHandleOption, targetID) {
+    let preTime = null
+    if (userFileHandleOption) {
+      // 下載中的檔案處理時間要延後
+      const processorFile = await modelHandler.getJSObjData('./model/processor.json')
+      preTime = processorFile.queue[targetID]
+      if (preTime) {
+        processorFile.queue[targetID] = null
+        await modelHandler.saveJSObjData(processorFile, 'processor')
+      }
+    }
+    return preTime
   }
 }
 
 module.exports = {
   helper,
   webHandler,
+  fileHandler,
   modelHandler,
   downloadHandler
 }

@@ -23,7 +23,7 @@ module.exports = {
         checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
-        checkUserStreamingStatus: (user, retryTimes) => `${user} is offline, retry ${retryTimes}/${recordSetting.maxTryTimes} times to check`,
+        inValidOffline: (user) => `${user} record type is stream, status is updated by recording cmd.`,
         userCloseStream: user => `${user} is offline, start to delete isStreaming Data`,
         isTargetExist: 'Check if target user exist in living channels ...'
       },
@@ -51,20 +51,28 @@ module.exports = {
       created: msg => `Create ${prefix}${msg}.bat`,
       processKilled: msg => `${msg}'s record process killed`
     },
+    processAction: {
+      isStopped: millisecond => `File process procedure is occupied, delay ${Math.floor(millisecond / (60 * 1000))} minutes`,
+      isStart: user => `Start to handle ${user}'s record`,
+      folder: {
+        isNotExist: dirName => `Folder ${dirName} is not exist`,
+        startToCreateFolder: path => `Start to create recorder folder, path: ${path}`
+      }
+    }
   },
   init: {
     folder: {
       recorder: {
         isNotExist: 'Directory recorder is not exist',
-        startToCreateDirectory: 'Start to create recorder directory'
+        startToCreateFolder: 'Start to create recorder directory'
       },
       model: {
         isNotExist: 'Directory model is not exist',
-        startToCreateDirectory: 'Start to create model directory'
+        startToCreateFolder: 'Start to create model directory'
       },
       seed: {
         isNotExist: 'Directory seed is not exist',
-        startToCreateDirectory: 'Start to create seed directory'
+        startToCreateFolder: 'Start to create seed directory'
       }
     },
     jsonFile: {
