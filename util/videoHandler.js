@@ -2,11 +2,8 @@ const fs = require('fs')
 const path = require('path');
 const cp = require('child_process');
 
-// const { helper, modelHandler } = require('./helper')
 const { processSetting } = require('../config/config')
 const { app } = require('../config/announce')
-// const { processAction } = app
-// const { isNotExist, startToCreateFolder } = processAction.folder
 
 const {
   suffix,
@@ -58,6 +55,11 @@ const videoHandler = {
       .catch((error) => console.error(error))
   },
 
+  /**
+   * 取得原始檔案、處理中或已經完成的檔案位置
+   * @param {string} type "origin" | "processing" |　"processed"
+   * @returns {string}　path 檔案位置
+   */
   getProcessPath(type) {
     switch (type) {
       case 'origin':
@@ -79,14 +81,11 @@ const videoHandler = {
    * @returns {string[]} Promise 依照處理改名的檔名，不含路徑
    */
   fileCombiner(processedFileNames, targetID, isDeleteFile, isCombine) {
-    console.log('fileCombiner')
     return new Promise((resolve, reject) => {
       if (!isCombine || processedFileNames.length === 1) {
-        console.log('fileCombiner single file Or No combine')
         videoHandler.moveFilesToProcessed(processedFileNames)
         resolve(processedFileNames)
       } else {
-        console.log('fileCombiner multi file')
         const filePath = videoHandler.getProcessPath(defaultPath.processing)
         const combineListPath = videoHandler.listMaker(filePath, processedFileNames, targetID)
         const processedFileName = videoHandler.getProcessFileName(processedFileNames[0], false, false, true)
@@ -94,12 +93,8 @@ const videoHandler = {
         cp.exec(combineCmd, (err, stdout, stderr) => {
           fs.unlinkSync(combineListPath)
           if (!err) {
-            console.log('File Combined！！！！！')
-            console.log('CombineFile:', `${filePath}\\${processedFileName}`, 'isExist', fs.existsSync(`${filePath}\\${processedFileName}`))
-            console.log('isDeleteFile', isDeleteFile)
             if (isDeleteFile) {
               for (const fileNames of processedFileNames) {
-                console.log('DELETE FILE:', `${filePath}\\${fileNames}`)
                 fs.unlinkSync(`${filePath}\\${fileNames}`)
               }
             } else {
@@ -127,34 +122,24 @@ const videoHandler = {
   },
 
   screenShotHandler(processedFileName, screenshotRatios) {
-    console.log('screenshotRatios', screenshotRatios, processedFileName)
-    // TODO 測試都不拍照是否成功
     if (processedFileName.length === 1) {
-      console.log('Start picture')
       return screenshotRatios.reduce((chain, currentRatio, currentIndex) => {
         return chain.then(() => videoHandler.screenShot(processedFileName[0], currentRatio, currentIndex + 1))
       }, Promise.resolve())
     } else {
-      console.log('no picture')
       Promise.resolve(processedFileName)
     }
   },
 
   screenShot(processedFileName, screenshotRatio, index) {
-    console.log('screenShot screenshotRatio:', screenshotRatio)
     return new Promise((resolve, reject) => {
       const root = videoHandler.getProcessPath(defaultPath.processed)
       const processedFileNameWithPath = path.resolve(`${root}\\${processedFileName}`)
       videoHandler.getDuration(processedFileNameWithPath)
         .then((duration) => {
           if (duration) {
-            console.log('processedFileNameWithPath', processedFileNameWithPath)
             const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
             cp.exec(cmd, (err, stdout, stderr) => {
-              console.log('err\n', err)
-              // console.log('stdout\n', stdout)
-              console.log('stderr\n', stderr)
-
               if (!err) {
                 resolve([processedFileName])
               } else {
@@ -170,33 +155,28 @@ const videoHandler = {
   },
 
   getDuration(filePath) {
-    console.log('filePath', filePath)
     return new Promise(resolve => {
       ffmpeg()
         .input(filePath)
         .ffprobe((err, data) => {
-          console.log('file', filePath, 'isExist', fs.existsSync(filePath))
           const duration = data && data.streams[0].duration
-          console.log('duration', duration)
           resolve(duration)
         })
     })
   },
 
   processFinished(processedFileName, targetID) {
-    console.log('processFinished', processedFileName, targetID)
     return new Promise(async (resolve) => {
       // 把所有檔案移動到processed
       videoHandler.moveFilesToProcessed([processedFileName])
-
       // 更新processor
       const processorFile = await videoHandler.getJSObjData('./model/processor.json')
       if (targetID in processorFile.onGoing) {
         const finishedData = processorFile.onGoing[targetID]
+        finishedData.finishedTime = new Date().toLocaleString()
         processorFile.success.push(finishedData)
         delete processorFile.onGoing[targetID]
       }
-      console.log('[]]更新processor:', processorFile)
       await videoHandler.saveJSObjData(processorFile, 'processor')
       resolve()
     })
@@ -226,7 +206,6 @@ const videoHandler = {
    */
   moveFilesToProcessed(files) {
     // 移動檔案到processed
-    console.log('移動檔案到processed')
     const from = videoHandler.getProcessPath(defaultPath.processing)
     const to = videoHandler.getProcessPath(defaultPath.processed)
     videoHandler.moveFiles(files, from, to)
@@ -260,10 +239,7 @@ const videoHandler = {
   },
 
   processVideo(videoDetail, processedFileNames = []) {
-    console.log('processVideo', videoDetail)
-
     return new Promise((resolve, reject) => {
-
       const { fileName, filePath, processOption } = videoDetail
       const { mute, compress, keepOriginalFile } = processOption
       const processFileName = videoHandler.getProcessFileName(fileName, mute, compress)
@@ -274,10 +250,8 @@ const videoHandler = {
       } else {
         const fileSource = `${filePath}\\${fileName}`
         const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
-        console.log('processVideo cp.exec', cmd)
         cp.exec(cmd, (err, stdout, stderr) => {
           if (!err) {
-            console.log('process done!!!!!!!!!!!', fileName, fileSource)
             if (!keepOriginalFile) {
               videoHandler.deleteFile(fileName, fileSource)
             } else {

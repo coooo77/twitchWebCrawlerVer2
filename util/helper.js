@@ -151,39 +151,44 @@ const helper = {
               helper.checkAndCorrectUserIsRecording(usersData, targetID)
             } else {
               const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
-              const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
-              if (!(isActive && isStopRecordOnlineStream)) {
-                // 非下載VOD的實況類型，一律以cmd來判斷下線
-                helper.announcer(livingChannel.inValidOffline(targetID))
-              } else {
-                /*
-                TOD 
-                VOD的實況類型用下線次數來判斷(或者用爬蟲)
-                要更新檢查資料的時間，以key來標記ID，value為時間
-                */
-                helper.announcer(livingChannel.userCloseStream(targetID))
-                // 修正錄製VOD造成使用者無法下線問題
-                await Promise.all([
-                  modelHandler.removeRecord(isStreaming, targetID),
-                  modelHandler.upDateIsRecording(usersData, targetID, false)
-                ])
-                // 下線 => 開始錄製VOD
-                helper.recordVOD(usersData, targetID, vodRecord)
+              if (userIndex !== -1) {
+                const { offlineTimesToCheck } = isStreaming.records[userIndex]
+                const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
+                if (!(isActive && isStopRecordOnlineStream)) {
+                  // 非下載VOD的實況類型，一律以cmd來判斷下線
+                  helper.announcer(livingChannel.inValidOffline(targetID))
+                } else if (offlineTimesToCheck < maxTryTimes) {
+                  isStreaming.records[userIndex].offlineTimesToCheck++
+                  helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
+                  await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
+                } else {
+
+                  /*
+                  TODO 要更新檢查資料的時間，以key來標記ID，value為時間
+                  */
+                  helper.announcer(livingChannel.userCloseStream(targetID))
+                  // 修正錄製VOD造成使用者無法下線問題
+                  await Promise.all([
+                    modelHandler.removeRecord(isStreaming, targetID),
+                    modelHandler.upDateIsRecording(usersData, targetID, false)
+                  ])
+                  // 下線 => 開始錄製VOD
+                  helper.recordVOD(usersData, targetID, vodRecord)
+                }
               }
             }
           }
         }
-
       }
     } else {
       helper.announcer(livingChannel.isNoLivingChannel)
     }
     // 檢查VOD pending名單上的實況主是否已經下線
-    for (const twitchID in vodRecord.pending) {
-      if (!livingChannelList.includes(twitchID)) {
-        helper.recordVOD(usersData, twitchID, vodRecord)
-      }
-    }
+    // for (const twitchID in vodRecord.pending) {
+    //   if (!livingChannelList.includes(twitchID)) {
+    //     helper.recordVOD(usersData, twitchID, vodRecord)
+    //   }
+    // }
   },
   async startToRecord(onlineStreamsData, isStreaming, usersData, vodRecord, page) {
     helper.announcer(app.recordAction.record.start)
@@ -199,7 +204,6 @@ const helper = {
           user = modelHandler.addUserToUsersData(usersData, twitchID)
         }
         if (!user.isRecording && !enableRecordVOD.isStopRecordOnlineStream) {
-          console.log('user ===========================>', user)
           helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming)
           break
         }
@@ -555,7 +559,8 @@ const modelHandler = {
       record = {
         ...userData,
         createdTime: Date.now(),
-        createdLocalTime: new Date().toLocaleString()
+        createdLocalTime: new Date().toLocaleString(),
+        offlineTimesToCheck: 0
       }
     } else if (file === 'usersData') {
       record = userData
@@ -713,33 +718,36 @@ const webHandler = {
   },
 
   async getOnlineStreamsData(page) {
-    const streamers = await page.evaluate(selector => {
-      const data = Array.from(document.querySelectorAll(selector))
-      return data.map(node => {
-        const html = node.innerHTML
-        if (!html) return
-        const handleHtml = html.split(' ')
-        const href = handleHtml.filter(str => str.includes('href='))
-        if (!href) return
-        const twitchID = href[1].split('/')[1]
-        const gameTypeHref = href[2].split('"')[1]
-        const streamTypes = gameTypeHref.split('/')[3]
-        return ({ twitchID, streamTypes })
-      })
-    }, homePage.liveCannelCard)
-    return streamers
+
+    try {
+      const streamers = await page.evaluate(selector => {
+        const data = Array.from(document.querySelectorAll(selector))
+        return data.map(node => {
+          const html = node.innerHTML
+          if (!html) return
+          const handleHtml = html.split(' ')
+          const href = handleHtml.filter(str => str.includes('href='))
+          if (!href) return
+          const twitchID = href[1].split('/')[1]
+          const gameTypeHref = href[2].split('"')[1]
+          const streamTypes = gameTypeHref.split('/')[3]
+          return ({ twitchID, streamTypes })
+        })
+      }, homePage.liveCannelCard)
+      return streamers
+    } catch (error) {
+      helper.announcer(`Function getOnlineStreamsData error: ${error}`, 'warn')
+    }
   },
 
   async waitForSpecificDomElement(page, selector, reTryInterval, count) {
     let waitFor = await page.$(selector)
     let retryTimes = 0
     while (!waitFor && retryTimes < count) {
-      // console.log('retryTimes', retryTimes)
       retryTimes++
       waitFor = await page.$(selector)
       await helper.wait(reTryInterval / count)
     }
-    // console.log('waitFor', typeof waitFor)
   },
   async checkVODRecord(target, page, vodRecord) {
     const { baseUrl, videos } = url
@@ -813,8 +821,7 @@ const fileHandler = {
   async addTimeToQueue(processorFile, targetID, timeToHandle = null) {
     if (!timeToHandle) {
       const timeNow = Date.now()
-      // timeToHandle = timeNow + 1000 * 60 * 60
-      timeToHandle = timeNow + 1000 * 60 * 2
+      timeToHandle = timeNow + 1000 * 60 * 60
     }
     processorFile.queue[targetID] = new Date(timeToHandle)
   },
@@ -927,7 +934,6 @@ const fileHandler = {
   async upDateProcessorData(fileName, targetID, preTime) {
     // 確認有該檔案才進行處理
     const isFileExist = fileHandler.checkIsFileExist(fileName, locationOfFolderWhereRecordSaved)
-    console.log('upDateProcessorData', fileName, 'isFileExist', isFileExist)
     if (!isFileExist) {
       // 沒有該檔案，而且有前一筆影片處理時間 => 恢復上一筆處理時間
       const processorFile = await modelHandler.getJSObjData('./model/processor.json')
@@ -946,7 +952,8 @@ const fileHandler = {
         } else {
           processorFile.pending[targetID] = {
             fileNames: [fileName],
-            processOption: {}
+            processOption: {},
+            createdLocalTime: new Date().toLocaleString()
           }
         }
         processorFile.pending[targetID].processOption = processOption
@@ -967,11 +974,8 @@ const fileHandler = {
     const timeNow = new Date()
     const { queue } = processorFile
     for (const twitchID of processorQueue) {
-      console.log('queue[twitchID]', queue[twitchID])
-      console.log(new Date(queue[twitchID]).toLocaleString())
       if (queue[twitchID] === null) continue
       const timeToCheck = new Date(queue[twitchID])
-      console.log('timeNow >= timeToCheck', timeNow >= timeToCheck)
       if (timeNow >= timeToCheck) {
         fileHandler.checkFileTimeRange(processorFile, twitchID, timeNow)
       }
@@ -1028,15 +1032,9 @@ const fileHandler = {
     delete processorFile.pending[targetID]
     delete processorFile.queue[targetID]
     processorFile.onGoing[targetID] = targetFileData
-    console.log('DELETE pending, queue', processorFile)
     await modelHandler.saveJSObjData(processorFile, 'processor')
-    // 沒有資料夾就建立一個
-
+    // 開始處理檔案
     helper.announcer(app.processAction.isStart(targetID))
-
-
-    // const { processOption } = targetFileData
-    console.log('videoHandler.mainProgram')
     videoHandler.mainProgram(targetFileData, targetID)
   },
 

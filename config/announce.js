@@ -1,5 +1,5 @@
 const { recordSetting } = require('./config')
-const { prefix } = recordSetting
+const { prefix, maxTryTimes } = recordSetting
 module.exports = {
   app: {
     startToLogin: 'User needs to login, start to login...',
@@ -25,7 +25,8 @@ module.exports = {
         userIsStillStreaming: msg => `${msg} is still streaming`,
         inValidOffline: (user) => `${user} record type is stream, status is updated by recording cmd.`,
         userCloseStream: user => `${user} is offline, start to delete isStreaming Data`,
-        isTargetExist: 'Check if target user exist in living channels ...'
+        isTargetExist: 'Check if target user exist in living channels ...',
+        isInRetryInterval: (user, retryTimes) => `${user} is offline, retry ${retryTimes} times (max: ${maxTryTimes} times) to delete file from isStreaming.json.`
       },
       record: {
         start: '=> Start to check and record stream...',
