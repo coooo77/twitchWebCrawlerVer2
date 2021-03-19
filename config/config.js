@@ -34,7 +34,7 @@ const config = {
     maxTryTimes: 5,
     prefix: '',
     stopRecordDuringReTryInterval: true,
-    isRecordEveryOnlineChannel: true,
+    isRecordEveryOnlineChannel: false,
     taskQueueConfig: {
       mode: 'countdownTimer',
       countdownTimer: 1,
@@ -80,6 +80,16 @@ const config = {
    * @param {Number} countdownTimer 設定實況結束幾分鐘後錄製VOD
    * @param {Object} specificTimeZone 設定固定時間點，例如凌晨3點開始下載VOD
    * @param {Object} taskQueue 排隊式下載VOD，一個VOD下載完才會去下載另一個標記有taskQueue的VOD，下載設定參照taskQueue
+   * 
+   * fileHandleOption(影片處理選項)
+   * keep 保持原有檔案
+   * mute 靜音檔案
+   * compress 壓縮檔案
+   * combine 合併檔案
+   * from:0300 限定處理起始時間
+   * to:0400 限定處理結束時間
+   * screenshot:70_80_90
+   * @param {string} fileHandleOption keep mute compress combine from:0300 to:0400 screenshot:70_80_90
    */
 
   seedUsersDataSetting: {
@@ -100,7 +110,7 @@ const config = {
       isActive: false,
       targetType: ['Art', 'Just%20Chatting']
     },
-    fileHandleOption: 'keep mute compress combine from:0000 to:2359 screenshot:70_80_90'
+    fileHandleOption: 'mute compress combine screenshot:30_40_50_60_70_80_90'
   }
 }
 
