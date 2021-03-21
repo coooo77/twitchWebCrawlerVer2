@@ -7,7 +7,8 @@ const { app } = require('../config/announce')
 
 const {
   suffix,
-  fileLocation
+  fileLocation,
+  processOutputType
 } = processSetting
 
 const {
@@ -26,33 +27,37 @@ const videoHandler = {
    * @param {string} targetID 實況者ID
    */
   mainProgram(targetFileData, targetID) {
-    const {
-      taskMaker,
-      moveFiles,
-      fileCombiner,
-      getProcessPath,
-      processFinished,
-      screenShotHandler,
-      reductiveProcessChain
-    } = videoHandler
+    try {
+      const {
+        taskMaker,
+        moveFiles,
+        fileCombiner,
+        getProcessPath,
+        processFinished,
+        screenShotHandler,
+        reductiveProcessChain
+      } = videoHandler
 
-    const { fileNames, processOption } = targetFileData
-    const { keepOriginalFile, screenshots, combine } = processOption
-    const task = taskMaker(fileNames, processOption)
+      const { fileNames, processOption } = targetFileData
+      const { keepOriginalFile, screenshots, combine } = processOption
+      const task = taskMaker(fileNames, processOption)
 
-    // 把所有檔案移動到processing
-    const originalFilePath = origin
-    const toPath = getProcessPath(defaultPath.processing)
-    moveFiles(fileNames, originalFilePath, toPath)
+      // 把所有檔案移動到processing
+      const originalFilePath = origin
+      const toPath = getProcessPath(defaultPath.processing)
+      moveFiles(fileNames, originalFilePath, toPath)
 
-    // 開始處理檔案
-    // 需要確認到底每個promise傳出來的是什麼
-    // 單一檔案等同於不要合併，但是能拍照
-    reductiveProcessChain(task)
-      .then((processedFileNames) => fileCombiner(processedFileNames, targetID, !keepOriginalFile, combine))
-      .then((processedFileName) => screenShotHandler(processedFileName, screenshots))
-      .then((processedFileName) => processFinished(processedFileName, targetID))
-      .catch((error) => console.error(error))
+      // 開始處理檔案
+      // 需要確認到底每個promise傳出來的是什麼
+      // 單一檔案等同於不要合併，但是能拍照
+      reductiveProcessChain(task)
+        .then((processedFileNames) => fileCombiner(processedFileNames, targetID, !keepOriginalFile, combine))
+        .then((processedFileName) => screenShotHandler(processedFileName, screenshots))
+        .then((processedFileName) => processFinished(processedFileName, targetID))
+        .catch((error) => videoHandler.upDateOngoingFiles(targetID, 'error', { error }))
+    } catch (error) {
+      videoHandler.upDateOngoingFiles(targetID, 'error', { error })
+    }
   },
 
   /**
@@ -82,30 +87,34 @@ const videoHandler = {
    */
   fileCombiner(processedFileNames, targetID, isDeleteFile, isCombine) {
     return new Promise((resolve, reject) => {
-      if (!isCombine || processedFileNames.length === 1) {
-        videoHandler.moveFilesToProcessed(processedFileNames)
-        resolve(processedFileNames)
-      } else {
-        const filePath = videoHandler.getProcessPath(defaultPath.processing)
-        const combineListPath = videoHandler.listMaker(filePath, processedFileNames, targetID)
-        const processedFileName = videoHandler.getProcessFileName(processedFileNames[0], false, false, true)
-        const combineCmd = `ffmpeg -f concat -safe 0 -i ${combineListPath} -c copy ${filePath}\\${processedFileName}`
-        cp.exec(combineCmd, (err, stdout, stderr) => {
-          fs.unlinkSync(combineListPath)
-          if (!err) {
-            if (isDeleteFile) {
-              for (const fileNames of processedFileNames) {
-                fs.unlinkSync(`${filePath}\\${fileNames}`)
+      try {
+        if (!isCombine || processedFileNames.length === 1) {
+          videoHandler.moveFilesToProcessed(processedFileNames)
+          resolve(processedFileNames)
+        } else {
+          const filePath = videoHandler.getProcessPath(defaultPath.processing)
+          const combineListPath = videoHandler.listMaker(filePath, processedFileNames, targetID)
+          const processedFileName = videoHandler.getProcessFileName(processedFileNames[0], false, false, true, processOutputType)
+          const combineCmd = `ffmpeg -f concat -safe 0 -i ${combineListPath} -c copy ${filePath}\\${processedFileName}`
+          cp.exec(combineCmd, (error, stdout, stderr) => {
+            fs.unlinkSync(combineListPath)
+            if (!error) {
+              if (isDeleteFile) {
+                for (const fileNames of processedFileNames) {
+                  fs.unlinkSync(`${filePath}\\${fileNames}`)
+                }
+              } else {
+                videoHandler.moveFilesToProcessed(processedFileNames)
               }
+              videoHandler.moveFilesToProcessed([processedFileName])
+              resolve([processedFileName])
             } else {
-              videoHandler.moveFilesToProcessed(processedFileNames)
+              reject({ ProcedureName: 'fileCombiner ffmpeg', error })
             }
-            videoHandler.moveFilesToProcessed([processedFileName])
-            resolve([processedFileName])
-          } else {
-            reject(err)
-          }
-        })
+          })
+        }
+      } catch (error) {
+        reject({ ProcedureName: 'fileCombiner', error })
       }
     })
   },
@@ -133,51 +142,79 @@ const videoHandler = {
 
   screenShot(processedFileName, screenshotRatio, index) {
     return new Promise((resolve, reject) => {
-      const root = videoHandler.getProcessPath(defaultPath.processed)
-      const processedFileNameWithPath = path.resolve(`${root}\\${processedFileName}`)
-      videoHandler.getDuration(processedFileNameWithPath)
-        .then((duration) => {
-          if (duration) {
-            const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
-            cp.exec(cmd, (err, stdout, stderr) => {
-              if (!err) {
-                resolve([processedFileName])
-              } else {
-                reject(err)
-              }
-            })
-          } else {
-            console.log('Loss Duration, skip shot')
-            resolve(processedFileName)
-          }
-        })
+      try {
+        const root = videoHandler.getProcessPath(defaultPath.processed)
+        const processedFileNameWithPath = path.resolve(`${root}\\${processedFileName}`)
+        videoHandler.getDuration(processedFileNameWithPath)
+          .then((duration) => {
+            if (duration) {
+              const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
+              cp.exec(cmd, (error, stdout, stderr) => {
+                if (!error) {
+                  resolve([processedFileName])
+                } else {
+                  reject({ ProcedureName: 'screenShot ffmpeg', error })
+                }
+              })
+            } else {
+              console.log('Loss Duration, skip shot')
+              resolve([processedFileName])
+            }
+          })
+      } catch (error) {
+        reject({ ProcedureName: 'screenShot', error })
+      }
     })
   },
 
   getDuration(filePath) {
-    return new Promise(resolve => {
-      ffmpeg()
-        .input(filePath)
-        .ffprobe((err, data) => {
-          const duration = data && data.streams[0].duration
-          resolve(duration)
-        })
+    return new Promise((resolve, reject) => {
+      try {
+        ffmpeg()
+          .input(filePath)
+          .ffprobe((error, data) => {
+            const duration = data && data.streams[0].duration
+            resolve(duration)
+          })
+      } catch (error) {
+        reject({ ProcedureName: 'getDuration', error })
+      }
     })
   },
 
+  /**
+   * 把onGoing的資料動到 success | error
+   * @param {string} targetID 實況者ID
+   * @param {string} type 移動的目標位置 success | error
+   * @param {object} addData 補充的資料，例如錯誤訊息等等
+   */
+  async upDateOngoingFiles(targetID, type = 'success', addData = null) {
+    const processorFile = await videoHandler.getJSObjData('./model/processor.json')
+    if (targetID in processorFile.onGoing) {
+      let finishedData = processorFile.onGoing[targetID]
+      finishedData.finishedTime = new Date().toLocaleString()
+      if (addData) {
+        finishedData = { ...finishedData, ...addData }
+      }
+      processorFile[type].push(finishedData)
+
+      delete processorFile.onGoing[targetID]
+    }
+    await videoHandler.saveJSObjData(processorFile, 'processor')
+  },
+
+  /**
+   * 檔案處理結束，移動檔案到結束、更新檔案從onGoing到success
+   * @param {string} processedFileName 已經處理完畢的檔案名稱
+   * @param {string} targetID 實況者ID
+   * @returns undefined
+   */
   processFinished(processedFileName, targetID) {
     return new Promise(async (resolve) => {
       // 把所有檔案移動到processed
       videoHandler.moveFilesToProcessed([processedFileName])
       // 更新processor
-      const processorFile = await videoHandler.getJSObjData('./model/processor.json')
-      if (targetID in processorFile.onGoing) {
-        const finishedData = processorFile.onGoing[targetID]
-        finishedData.finishedTime = new Date().toLocaleString()
-        processorFile.success.push(finishedData)
-        delete processorFile.onGoing[targetID]
-      }
-      await videoHandler.saveJSObjData(processorFile, 'processor')
+      videoHandler.upDateOngoingFiles(targetID)
       resolve()
     })
   },
@@ -240,32 +277,35 @@ const videoHandler = {
 
   processVideo(videoDetail, processedFileNames = []) {
     return new Promise((resolve, reject) => {
-      const { fileName, filePath, processOption } = videoDetail
-      const { mute, compress, keepOriginalFile } = processOption
-      const processFileName = videoHandler.getProcessFileName(fileName, mute, compress)
+      try {
+        const { fileName, filePath, processOption } = videoDetail
+        const { mute, compress, keepOriginalFile } = processOption
+        const processFileName = videoHandler.getProcessFileName(fileName, mute, compress, false, processOutputType)
 
-      if (!mute && !compress) {
-        processedFileNames.push(processFileName)
-        resolve(processedFileNames)
-      } else {
-        const fileSource = `${filePath}\\${fileName}`
-        const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
-        cp.exec(cmd, (err, stdout, stderr) => {
-          if (!err) {
-            if (!keepOriginalFile) {
-              videoHandler.deleteFile(fileName, fileSource)
+        if (!mute && !compress) {
+          processedFileNames.push(processFileName)
+          resolve(processedFileNames)
+        } else {
+          const fileSource = `${filePath}\\${fileName}`
+          const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
+          cp.exec(cmd, (error, stdout, stderr) => {
+            if (!error) {
+              if (!keepOriginalFile) {
+                videoHandler.deleteFile(fileName, fileSource)
+              } else {
+                videoHandler.moveFilesToProcessed([fileName])
+              }
+              processedFileNames.push(processFileName)
+              resolve(processedFileNames)
             } else {
-              videoHandler.moveFilesToProcessed([fileName])
+              reject({ ProcedureName: 'processVideo ffmpeg', error: error })
             }
-            processedFileNames.push(processFileName)
-            resolve(processedFileNames)
-          } else {
-            reject(err)
-          }
-        })
+          })
+        }
+      } catch (error) {
+        reject({ ProcedureName: 'processVideo', error })
       }
     })
-
   },
 
   deleteFile(fileName, fileSource) {
@@ -273,7 +313,6 @@ const videoHandler = {
       fs.unlinkSync(fileSource)
     } catch (error) {
       const errorMsg = `Can not delete file ${fileName}`
-      // helper.announcer(errorMsg, 'warn')
       throw new Error(errorMsg)
     }
   },
@@ -289,16 +328,32 @@ const videoHandler = {
     return cmd
   },
 
-  getProcessFileName(fileName, isMute, isCompress, isCombined = false) {
+  /**
+   * 根據設定修改檔案名稱
+   * @param {string} fileName 檔案名稱(something.ts/something.mp4)
+   * @param {boolean} isMute 是否靜音
+   * @param {boolean} isCompress  是否壓縮
+   * @param {boolean} isCombined 是否合併(非必要參數)
+   * @param {string} fileTypeName 指定輸出類型 ts | mp4(非必要參數)
+   * @returns {string} 檔案名稱something_mute_compress_combined.mp4
+   */
+  getProcessFileName(fileName, isMute, isCompress, isCombined = false, fileTypeName = null) {
     const dotIndex = fileName.lastIndexOf('.')
-    const fileType = fileName.slice(dotIndex)
+    const fileType = fileTypeName || fileName.slice(dotIndex)
     let sliceName = fileName.slice(0, dotIndex)
     if (isMute) sliceName += `${suffix.mute ? `_${suffix.mute}` : '_mute'}`
     if (isCompress) sliceName += `${suffix.compress ? `_${suffix.compress}` : '_compress'}`
     if (isCombined) sliceName += `${suffix.combined ? `_${suffix.combined}` : '_combined'}`
+    console.log('====> fileType:', fileType)
     return `${sliceName}${fileType}`
   },
 
+  /**
+   * 建立資料夾
+   * @param {string} folderName 資料夾名稱
+   * @param {string} folderRootPath 資料夾位置(不包含資料夾名稱)
+   * @returns {string} 資料夾位置
+   */
   makeDirIfNotExist(folderName, folderRootPath) {
     const filePath = path.resolve(folderRootPath, folderName)
     if (!fs.existsSync(filePath)) {
@@ -307,6 +362,11 @@ const videoHandler = {
     return filePath
   },
 
+  /**
+   * 取得對應資料夾位置，沒有的話就會用預設設定創造資料夾
+   * @param {string} folderName 資料夾名稱
+   * @returns {string} 資料夾位置 
+   */
   getDirPath(folderName) {
     const root = videoHandler.getRootFolderPath()
     const process = videoHandler.makeDirIfNotExist('Process', root)
@@ -324,6 +384,13 @@ const videoHandler = {
     return dirPath.slice(0, spliceIndex)
   },
 
+  /**
+   * 
+   * @param {object}} data 
+   * @param {string} fileName 想要存的json檔案名稱
+   * @param {string} dirLocation 檔案位置(不包含檔案名稱)
+   * @returns {promises.reject} 拋錯處裡
+   */
   saveJSObjData(data, fileName = 'usersData', dirLocation = './model/') {
     return new Promise((resolve, reject) => {
       try {
@@ -332,18 +399,29 @@ const videoHandler = {
           JSON.stringify(data),
           'utf8',
           (error) => {
-            console.log(error);
+            console.error(error);
+            reject({ ProcedureName: 'saveJSObjData', error })
           })
         resolve()
       } catch (error) {
         console.error(error)
-        reject(error)
+        reject({ ProcedureName: 'saveJSObjData', error })
       }
     })
   },
 
+  /**
+   * 取得json資料
+   * @param {string} dataLocation json檔案絕對位置(包含檔名)
+   * @returns {object} 解析過的檔案
+   */
   async getJSObjData(dataLocation) {
-    let result = await fs.readFileSync(dataLocation, 'utf8', (err, data) => data)
+    let result = await fs.readFileSync(dataLocation, 'utf8', (error, data) => {
+      if (error) {
+        throw new Error({ ProcedureName: 'getJSObjData', error })
+      }
+      return data
+    })
     result = JSON.parse(result)
     return result
   }
