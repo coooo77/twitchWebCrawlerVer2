@@ -344,7 +344,6 @@ const videoHandler = {
     if (isMute) sliceName += `${suffix.mute ? `_${suffix.mute}` : '_mute'}`
     if (isCompress) sliceName += `${suffix.compress ? `_${suffix.compress}` : '_compress'}`
     if (isCombined) sliceName += `${suffix.combined ? `_${suffix.combined}` : '_combined'}`
-    console.log('====> fileType:', fileType)
     return `${sliceName}${fileType}`
   },
 
