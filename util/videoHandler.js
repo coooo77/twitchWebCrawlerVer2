@@ -8,6 +8,7 @@ const { app } = require('../config/announce')
 const {
   suffix,
   fileLocation,
+  enableShowCmd,
   processOutputType
 } = processSetting
 
@@ -19,6 +20,8 @@ const {
 } = fileLocation
 
 const ffmpeg = require('./ffmpeg')
+
+const isShowCmd = enableShowCmd ? 'start ' : ''
 
 const videoHandler = {
   /**
@@ -96,7 +99,7 @@ const videoHandler = {
           const combineListPath = videoHandler.listMaker(filePath, processedFileNames, targetID)
           const processedFileName = videoHandler.getProcessFileName(processedFileNames[0], false, false, true, processOutputType)
           const combineCmd = `ffmpeg -f concat -safe 0 -i ${combineListPath} -c copy ${filePath}\\${processedFileName}`
-          cp.exec(combineCmd, (error, stdout, stderr) => {
+          cp.exec(isShowCmd + combineCmd, (error, stdout, stderr) => {
             fs.unlinkSync(combineListPath)
             if (!error) {
               if (isDeleteFile) {
@@ -149,7 +152,7 @@ const videoHandler = {
           .then((duration) => {
             if (duration) {
               const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
-              cp.exec(cmd, (error, stdout, stderr) => {
+              cp.exec(isShowCmd + cmd, (error, stdout, stderr) => {
                 if (!error) {
                   resolve([processedFileName])
                 } else {
@@ -288,7 +291,7 @@ const videoHandler = {
         } else {
           const fileSource = `${filePath}\\${fileName}`
           const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
-          cp.exec(cmd, (error, stdout, stderr) => {
+          cp.exec(isShowCmd + cmd, (error, stdout, stderr) => {
             if (!error) {
               if (!keepOriginalFile) {
                 videoHandler.deleteFile(fileName, fileSource)

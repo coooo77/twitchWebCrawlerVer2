@@ -67,7 +67,8 @@ const config = {
     ffmpegPath: 'D:\\ffmpeg\\bin\\ffmpeg.exe',
     probePath: 'D:\\ffmpeg\\bin\\ffprobe.exe',
     minutesToDelay: 30 * 60 * 1000,
-    processOutputType: '.mp4' // .mp4 | .ts
+    processOutputType: '.mp4', // .mp4 | .ts
+    enableShowCmd: true
   },
   loginSetting: {
     isManual: false
