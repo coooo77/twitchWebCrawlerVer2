@@ -31,7 +31,7 @@ const {
 
 const { app, sorter } = require('../config/announce');
 const { login, homePage, VOD } = require('../config/domSelector');
-
+const { livingChannel } = app.recordAction
 
 const helper = {
   wait(ms) {
@@ -134,7 +134,7 @@ const helper = {
   },
 
   async checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord) {
-    const { livingChannel } = app.recordAction
+
     helper.announcer(livingChannel.checkStatus)
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
     if (isStreaming.ids.length !== 0) {
@@ -155,25 +155,20 @@ const helper = {
                 const { offlineTimesToCheck } = isStreaming.records[userIndex]
                 const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
                 if (!(isActive && isStopRecordOnlineStream)) {
-                  // 非下載VOD的實況類型，一律以cmd來判斷下線
-                  helper.announcer(livingChannel.inValidOffline(targetID))
+                  // 非下載VOD的實況類型，以cmd來或離線次數*10判斷下線
+                  if (offlineTimesToCheck < maxTryTimes * 10) {
+                    isStreaming.records[userIndex].offlineTimesToCheck++
+                    helper.announcer(livingChannel.inValidOffline(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
+                    await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
+                  } else {
+                    await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
+                  }
                 } else if (offlineTimesToCheck < maxTryTimes) {
                   isStreaming.records[userIndex].offlineTimesToCheck++
                   helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
                   await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
                 } else {
-
-                  /*
-                  TODO 要更新檢查資料的時間，以key來標記ID，value為時間
-                  */
-                  helper.announcer(livingChannel.userCloseStream(targetID))
-                  // 修正錄製VOD造成使用者無法下線問題
-                  await Promise.all([
-                    modelHandler.removeRecord(isStreaming, targetID),
-                    modelHandler.upDateIsRecording(usersData, targetID, false)
-                  ])
-                  // 下線 => 開始錄製VOD
-                  helper.recordVOD(usersData, targetID, vodRecord)
+                  await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
                 }
               }
             }
@@ -189,6 +184,26 @@ const helper = {
     //     helper.recordVOD(usersData, twitchID, vodRecord)
     //   }
     // }
+  },
+  /**
+   * 處理使用者下線，狀態更新、VOD紀錄
+   * @param {string} targetID 實況者ID
+   * @param {object} isStreaming 正在實況者們的資料
+   * @param {object} usersData 實況者們的資料
+   * @param {object} vodRecord VOD紀錄
+   */
+  async offlineHandler(targetID, isStreaming, usersData, vodRecord) {
+    /*
+    TODO 要更新檢查資料的時間，以key來標記ID，value為時間
+    */
+    helper.announcer(livingChannel.userCloseStream(targetID))
+    // 修正錄製VOD造成使用者無法下線問題
+    await Promise.all([
+      modelHandler.removeRecord(isStreaming, targetID),
+      modelHandler.upDateIsRecording(usersData, targetID, false)
+    ])
+    // 下線 => 開始錄製VOD
+    helper.recordVOD(usersData, targetID, vodRecord)
   },
   async startToRecord(onlineStreamsData, isStreaming, usersData, vodRecord, page) {
     helper.announcer(app.recordAction.record.start)
@@ -317,17 +332,16 @@ const helper = {
 }
 
 const downloadHandler = {
-
-
   async execFile(cmd, targetID, fileName) {
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
     const preTime = await fileHandler.delayProcessTime(userFileHandleOption, targetID)
     cp.exec('start ' + cmd, async (error, stdout, stderr) => {
       if (!error) {
         helper.announcer(app.recordAction.record.end(targetID))
-        const [isStreaming, usersData] = await Promise.all([
+        const [isStreaming, usersData, vodRecord] = await Promise.all([
           modelHandler.getJSObjData('./model/isStreaming.json'),
           modelHandler.getJSObjData('./model/usersData.json'),
+          modelHandler.getJSObjData('./model/vodRecord.json')
         ])
 
         await Promise.all([
@@ -335,6 +349,10 @@ const downloadHandler = {
           modelHandler.upDateIsRecording(usersData, targetID, false)
         ])
         await fileHandler.upDateProcessorData(fileName, targetID, preTime)
+
+        if (targetID in vodRecord.pending) {
+          await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
+        }
       }
     })
   },

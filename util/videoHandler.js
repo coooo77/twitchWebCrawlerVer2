@@ -152,7 +152,7 @@ const videoHandler = {
           .then((duration) => {
             if (duration) {
               const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
-              cp.exec(isShowCmd + cmd, (error, stdout, stderr) => {
+              cp.exec(cmd, (error, stdout, stderr) => {
                 if (!error) {
                   resolve([processedFileName])
                 } else {

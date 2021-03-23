@@ -23,7 +23,7 @@ module.exports = {
         checkStatus: '=> Check if any of users is offline...',
         isNoLivingChannel: 'No target user streaming',
         userIsStillStreaming: msg => `${msg} is still streaming`,
-        inValidOffline: (user) => `${user} record type is stream, status is updated by recording cmd.`,
+        inValidOffline: (user, retryTimes) => `${user} record type is stream, status is updated by recording cmd. Retry ${retryTimes} times (max: ${maxTryTimes * 10} times) to delete file from isStreaming.json.`,
         userCloseStream: user => `${user} is offline, start to delete isStreaming Data`,
         isTargetExist: 'Check if target user exist in living channels ...',
         isInRetryInterval: (user, retryTimes) => `${user} is offline, retry ${retryTimes} times (max: ${maxTryTimes} times) to delete file from isStreaming.json.`
