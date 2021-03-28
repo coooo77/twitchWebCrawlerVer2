@@ -134,42 +134,39 @@ const helper = {
   },
 
   async checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord) {
-
     helper.announcer(livingChannel.checkStatus)
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
     if (isStreaming.ids.length !== 0) {
       for (let i = isStreaming.ids.length - 1; i >= 0; i--) {
         const targetID = isStreaming.ids[i]
-        if (targetID) {
-          if (livingChannelList.includes(targetID)) {
+        if (livingChannelList.includes(targetID)) {
+          helper.announcer(livingChannel.userIsStillStreaming(targetID))
+          helper.checkAndCorrectUserIsRecording(usersData, targetID)
+        } else {
+          const isChannelOnline = await helper.checkChannelStatus(targetID)
+          if (isChannelOnline) {
             helper.announcer(livingChannel.userIsStillStreaming(targetID))
             helper.checkAndCorrectUserIsRecording(usersData, targetID)
           } else {
-            const isChannelOnline = await helper.checkChannelStatus(targetID)
-            if (isChannelOnline) {
-              helper.announcer(livingChannel.userIsStillStreaming(targetID))
-              helper.checkAndCorrectUserIsRecording(usersData, targetID)
-            } else {
-              const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
-              if (userIndex !== -1) {
-                const { offlineTimesToCheck } = isStreaming.records[userIndex]
-                const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
-                if (!(isActive && isStopRecordOnlineStream)) {
-                  // 非下載VOD的實況類型，以cmd來或離線次數*10判斷下線
-                  if (offlineTimesToCheck < maxTryTimes * 10) {
-                    isStreaming.records[userIndex].offlineTimesToCheck++
-                    helper.announcer(livingChannel.inValidOffline(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
-                    await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
-                  } else {
-                    await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
-                  }
-                } else if (offlineTimesToCheck < maxTryTimes) {
+            const userIndex = isStreaming.records.findIndex(user => user.twitchID === targetID)
+            if (userIndex !== -1) {
+              const { offlineTimesToCheck } = isStreaming.records[userIndex]
+              const { isActive, isStopRecordOnlineStream } = isStreaming.records[userIndex].enableRecordVOD
+              if (!(isActive && isStopRecordOnlineStream)) {
+                // 非下載VOD的實況類型，以cmd來或離線次數*10判斷下線
+                if (offlineTimesToCheck < maxTryTimes * 10) {
                   isStreaming.records[userIndex].offlineTimesToCheck++
-                  helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
+                  helper.announcer(livingChannel.inValidOffline(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
                   await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
                 } else {
                   await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
                 }
+              } else if (offlineTimesToCheck < maxTryTimes) {
+                isStreaming.records[userIndex].offlineTimesToCheck++
+                helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
+                await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
+              } else {
+                await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
               }
             }
           }
@@ -236,7 +233,7 @@ const helper = {
           if (!isStreaming.ids.includes(user.twitchID)) {
             modelHandler.upDateJsonFile(isStreaming, user)
           }
-        } else if (!user.isRecording) {
+        } else if (!user.isRecording || !isStreaming.ids.includes(user.twitchID)) {
           helper.checkStreamTypeAndRecord(user, streamTypes, twitchID, usersData, isStreaming)
         }
       }
