@@ -742,10 +742,15 @@ const webHandler = {
             if (!html) return
             const handleHtml = html.split(' ')
             const href = handleHtml.filter(str => str.includes('href='))
-            if (!href) return
+            if (!href[1]) return
             const twitchID = href[1].split('/')[1]
-            const gameTypeHref = href[2].split('"')[1]
-            const streamTypes = gameTypeHref.split('/')[3]
+            let streamTypes
+            if (!href[2]) {
+              streamTypes = null
+            } else {
+              const gameTypeHref = href[2].split('"')[1]
+              streamTypes = gameTypeHref.split('/')[3]
+            }
             return ({ twitchID, streamTypes })
           })
         } else {
