@@ -11,9 +11,14 @@ let recursionTime = 1
 function startApp(browser) {
   return new Promise((resolve, reject) => {
     try {
+      const errorTimer = setInterval(() => {
+        helper.announcer(twitch.errorOccurred, 'warn')
+      }, checkStreamInterval * 2);
+
       setTimeout(async () => {
         announcer(timeAnnounce(recursionTime++), 'time')
         await app(browser)
+        clearInterval(errorTimer)
         resolve()
       }, checkStreamInterval)
     } catch (error) {
@@ -27,8 +32,15 @@ function startApp(browser) {
   announcer(startToMonitor)
   announcer(timeAnnounce(recursionTime++), 'time')
   const browser = await puppeteer.launch(puppeteerSetting);
+  // 用來VOD下載結束後確認時間長度
+  global.browser = browser
   await app(browser)
   while (true) {
     await startApp(browser)
+    let used = process.memoryUsage();
+    for (let key in used) {
+      console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+    }
+    used = null
   }
 })()

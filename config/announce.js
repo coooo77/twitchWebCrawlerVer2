@@ -107,7 +107,8 @@ module.exports = {
   },
   twitch: {
     startToMonitor: 'Start to monitor Twitch web site ...',
-    timeAnnounce: msg => `第${msg}次執行檢查，輸入ctrl+c結束錄影 ${new Date().toLocaleString()}`
+    timeAnnounce: msg => `第${msg}次執行檢查，輸入ctrl+c結束錄影 ${new Date().toLocaleString()}`,
+    errorOccurred: `Error Occur!!! -${new Date().toLocaleString()}-`
   },
   sorter: {
     arrayLength: (name, number) => `${name} length: ${number}`,
