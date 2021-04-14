@@ -315,8 +315,7 @@ const videoHandler = {
     try {
       fs.unlinkSync(fileSource)
     } catch (error) {
-      const errorMsg = `Can not delete file ${fileName}`
-      throw new Error(errorMsg)
+      console.error(`Can not delete file ${fileName}`)
     }
   },
 
