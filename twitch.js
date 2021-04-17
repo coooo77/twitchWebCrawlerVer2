@@ -11,14 +11,14 @@ let recursionTime = 1
 function startApp(browser) {
   return new Promise((resolve, reject) => {
     try {
-      const errorTimer = setInterval(() => {
+      const errorTimer = setTimeout(() => {
         helper.announcer(twitch.errorOccurred, 'warn')
       }, checkStreamInterval * 2);
 
       setTimeout(async () => {
         announcer(timeAnnounce(recursionTime++), 'time')
         await app(browser)
-        clearInterval(errorTimer)
+        clearTimeout(errorTimer)
         resolve()
       }, checkStreamInterval)
     } catch (error) {
