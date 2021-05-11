@@ -18,6 +18,7 @@ module.exports = {
   VOD: {
     videoUrl: 'a[data-a-target="preview-card-image-link"]',
     videoImage: 'div.preview-card-thumbnail__image > img',
-    videoCategory: 'a[data-a-target="preview-card-game-link"]'
+    videoCategory: 'a[data-a-target="preview-card-game-link"]',
+    videoDuration: 'p[data-a-target="player-seekbar-duration"]'
   }
 }

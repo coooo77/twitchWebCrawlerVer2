@@ -26,6 +26,7 @@ const {
 } = recordSetting
 
 const {
+  fileLocation,
   minutesToDelay
 } = processSetting
 
@@ -162,6 +163,7 @@ const helper = {
                   await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
                 }
               } else if (offlineTimesToCheck < maxTryTimes) {
+                console.log('offlineTimesToCheck < maxTryTimes', offlineTimesToCheck < maxTryTimes)
                 isStreaming.records[userIndex].offlineTimesToCheck++
                 helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
                 await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
@@ -421,7 +423,7 @@ const downloadHandler = {
     modelHandler.sterilizeVodRecord(vodRecord, targetID, url, record)
     await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
 
-    return record.cmdCommand
+    return record
   },
 
   async afterDownloadVOD(targetID, url, error) {
@@ -458,14 +460,18 @@ const downloadHandler = {
 
   async downloadVOD(targetID, url) {
     if (!url) return
-    const cmd = await downloadHandler.beforeDownloadVOD(targetID, url)
+    const record = await downloadHandler.beforeDownloadVOD(targetID, url)
+
+    const { cmdCommand, fileName } = record
 
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
     if (userFileHandleOption) {
       await modelHandler.updateProcessorFile('queue', targetID, null)
     }
 
-    await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
+    await cp.exec('start ' + cmdCommand, async (error, stdout, stderr) => {
+      const vodDuriation = await videoHandler.getDuration(`${fileLocation.origin}\\${fileName}`)
+      console.log('vodDuriation:', vodDuriation)
       await downloadHandler.afterDownloadVOD(targetID, url, error)
     })
   },
@@ -614,6 +620,8 @@ const modelHandler = {
       if (!url) continue
       const isRecordExist = vodRecord.ready.some(record => record.url === url)
       if (isRecordExist) continue
+      const videoLengthDetail = await webHandler.getVideoDuration(url)
+      const { isFetchSuccess } = videoLengthDetail
       const videoID = url.split('videos/')[1]
       const fileName = downloadHandler.getFileName(targetID, videoID, timeString)
       vodRecord.ready.push({
@@ -626,7 +634,11 @@ const modelHandler = {
         status: 'not download yet',
         isTaskQueue,
         startDownloadTime,
-        finishedTime: null
+        finishedTime: null,
+        reTryInterval: 1000 * 60, // 下載失敗重新下載間隔(毫秒)
+        retryTimes: 0,
+        formatTime: isFetchSuccess ? videoLengthDetail.formatTime : undefined,
+        totalDuration: isFetchSuccess ? videoLengthDetail.totalDuration : undefined
       })
     }
 
@@ -772,6 +784,51 @@ const webHandler = {
       await helper.wait(reTryInterval / count)
     }
   },
+
+  /**
+   * 擷取VOD時間
+   * @param {object} page puppeteerPageInstance
+   * @param {number} reTryInterval 總擷取的時間(毫秒)
+   * @param {number} count 總擷取的時間內的擷取次數上限
+   * @returns {object} 影片長度資訊
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async waitForFetchVODDuration(page, reTryInterval, count) {
+    let retryTimes = 0
+    let formatTime = 0
+    let rawTimeData = {
+      formatTime: '',
+      isFetchSuccess: false,
+      totalDuration: -1
+    }
+    while (retryTimes < count && formatTime <= 0) {
+      retryTimes++
+      rawTimeData = await webHandler.fetchVODDurationEl(page)
+      formatTime = rawTimeData.isFetchSuccess ? Number(rawTimeData.formatTime) : 0
+      formatTime
+      await helper.wait(reTryInterval / count)
+    }
+    return rawTimeData
+  },
+
+  async fetchVODDurationEl(page) {
+    const rawTimeData = await page.evaluate(selector => {
+      const seekBarElement = document.querySelector(selector)
+      return ({
+        formatTime: seekBarElement ? seekBarElement.innerText : undefined,
+        durationInSecond: seekBarElement ? seekBarElement.dataset.aValue : undefined,
+        isFetchSuccess: seekBarElement ? true : false
+      })
+    }, VOD.videoDuration)
+    if (rawTimeData && rawTimeData.formatTime) {
+      // 看起來時間格式會固定是00:00:00，而不會有00:00的情況
+      const formatTimeArr = rawTimeData.formatTime.split(':')
+      rawTimeData.formatTime = formatTimeArr.join('')
+      rawTimeData.durationInSecond = Number(rawTimeData.durationInSecond)
+    }
+    return rawTimeData
+  },
+
   async checkVODRecord(target, page, vodRecord) {
     const { baseUrl, videos } = url
     const { checkStreamContentType, twitchID } = target
@@ -832,7 +889,56 @@ const webHandler = {
       return null
     }
   },
+
+  /**
+   * 由VOD網址提供影片長度，包含小時、分、秒 + 總秒數 + 是否有取到資料
+   * @param {string} url VOD網址 Ex: https://www.twitch.tv/videos/1016665654
+   * @returns {object} 影片長度資訊 
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async getVideoDuration(url) {
+    let videoDurationInfo = {
+      formatTime: '',
+      isFetchSuccess: false,
+      totalDuration: -1
+    }
+    if (global.browser) {
+      const page = await global.browser.newPage()
+      videoDurationInfo = await webHandler.fetchVODDuration(page, url)
+    }
+    return videoDurationInfo
+  },
+
+  /**
+   * 爬蟲爬取VOD長度資訊
+   * @param {object} page puppeteerPageInstance
+   * @returns {object} 影片長度資訊
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async fetchVODDuration(page, url) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      await helper.wait(1000)
+      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 3000, 5)
+      const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
+      const returnData = {
+        formatTime: '',
+        isFetchSuccess: false,
+        totalDuration: -1
+      }
+      await page.close()
+      if (isFetchSuccess) {
+        returnData.formatTime = formatTime
+        returnData.isFetchSuccess = true
+        returnData.totalDuration = durationInSecond
+      }
+      return returnData
+    } catch (error) {
+      console.error('error at function: fetchVODLength', error)
+    }
+  }
 }
+
 
 const fileHandler = {
   /**
