@@ -100,8 +100,8 @@ const config = {
     enableRecordVOD: {
       isActive: false, // 啟動的話，開始檢查下列情況
       isStopRecordOnlineStream: false, // 啟動的話，禁止錄影正在實況中的實況，啟動的話，正在實況的實況會錄影，實況結束也會錄製VOD
-      mode: 'specificTimeZone',
-      countdownTimer: 60,
+      mode: 'countdownTimer',
+      countdownTimer: 120,
       specificTimeZone: {
         hour: 3,
         minute: 0,
@@ -109,10 +109,10 @@ const config = {
       },
     },
     checkStreamContentType: {
-      isActive: false,
+      isActive: true,
       targetType: ['Art', 'Just%20Chatting']
     },
-    fileHandleOption: 'mute compress combine screenshot:30_40_50_60_70_80_90'
+    fileHandleOption: 'mute compress screenshot:30_40_50_60_70_80_90'
   }
 }
 
