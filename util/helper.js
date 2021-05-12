@@ -29,6 +29,7 @@ const {
   fileLocation,
   minutesToDelay,
   maxReDownloadTimes,
+  reTryDownloadInterval,
   LossOfVODDurationAllowed
 } = processSetting
 
@@ -679,10 +680,10 @@ const modelHandler = {
         createdTime: Date.now(),
         createdLocalTime: new Date().toLocaleString(),
         status: 'not download yet',
-        isTaskQueue,
         startDownloadTime,
+        isTaskQueue,
         finishedTime: null,
-        reTryInterval: 1000 * 60, // 下載失敗重新下載間隔(毫秒)
+        reTryInterval: reTryDownloadInterval,
         retryTimes: 0,
         formatTime: isFetchSuccess ? videoLengthDetail.formatTime : undefined,
         totalDuration: isFetchSuccess ? videoLengthDetail.totalDuration : undefined
