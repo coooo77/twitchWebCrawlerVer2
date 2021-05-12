@@ -33,7 +33,9 @@ module.exports = {
         stop: (user, reason = 'type') => `Stop to record user ${user}, ${reason === 'type' ? `type of stream content isn't target type` : `stream is still in retry interval`}`,
         stopVOD: user => `User ${user} VOD type isn't target type`,
         findOnlineUser: user => `User ${user} is streaming, start to Record`,
-        end: user => `User ${user}'s stream is closed, start to delete recording`
+        end: user => `User ${user}'s stream is closed, start to delete recording`,
+        reachLimit: (user, url) => `User ${user}'s VOD has reached download limit, url is ${url}.`,
+        vodDownloadDetailLoss: (user, url) => `User ${user}'s VOD download information lost! Url is ${url}.`
       },
       VOD: {
         start: '=> start to get VOD information...'

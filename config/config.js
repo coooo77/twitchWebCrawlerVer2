@@ -68,7 +68,9 @@ const config = {
     probePath: 'D:\\ffmpeg\\bin\\ffprobe.exe',
     minutesToDelay: 30 * 60 * 1000,
     processOutputType: '.mp4', // .mp4 | .ts
-    enableShowCmd: true
+    enableShowCmd: true,
+    maxReDownloadTimes: 10, // VOD重新下載次數上限
+    LossOfVODDurationAllowed: 60 * 5, // VOD下載完能接受短少的時間長度
   },
   loginSetting: {
     isManual: false

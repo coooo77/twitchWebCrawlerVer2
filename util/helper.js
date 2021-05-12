@@ -27,12 +27,15 @@ const {
 
 const {
   fileLocation,
-  minutesToDelay
+  minutesToDelay,
+  maxReDownloadTimes,
+  LossOfVODDurationAllowed
 } = processSetting
 
 const { app, sorter } = require('../config/announce');
 const { login, homePage, VOD } = require('../config/domSelector');
-const { livingChannel } = app.recordAction
+const { recordAction } = app
+const { livingChannel } = recordAction
 
 const helper = {
   wait(ms) {
@@ -163,7 +166,6 @@ const helper = {
                   await helper.offlineHandler(targetID, isStreaming, usersData, vodRecord)
                 }
               } else if (offlineTimesToCheck < maxTryTimes) {
-                console.log('offlineTimesToCheck < maxTryTimes', offlineTimesToCheck < maxTryTimes)
                 isStreaming.records[userIndex].offlineTimesToCheck++
                 helper.announcer(livingChannel.isInRetryInterval(targetID, isStreaming.records[userIndex].offlineTimesToCheck))
                 await modelHandler.saveJSObjData(isStreaming, 'isStreaming')
@@ -376,13 +378,14 @@ const downloadHandler = {
    * @param {string} targetID 實況者ID
    * @param {string} videoID VOD影片ID
    * @param {string} timeString 影片下載的時間
+   * @param {string} formatTime 影片時間
    */
-  getFileName(targetID, videoID = null, timeString = null) {
+  getFileName(targetID, videoID = null, timeString = null, formatTime) {
     if (!timeString) timeString = downloadHandler.getTimeString()
-
+    if (!formatTime) formatTime = '000000'
     return videoID
-      ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}.ts`
-      : `${prefix}${targetID}_twitch_${timeString}.ts`
+      ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}_${formatTime}.ts`
+      : `${prefix}${targetID}_twitch_${timeString}_${formatTime}.ts`
   },
 
   getTimeString() {
@@ -413,7 +416,7 @@ const downloadHandler = {
 
   async beforeDownloadVOD(targetID, url) {
     let vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
-    let recordIndex = vodRecord.ready.findIndex(record => record.url === url)
+    const recordIndex = vodRecord.ready.findIndex(record => record.url === url)
     let record = vodRecord.ready[recordIndex]
 
     record.status = 'downloading'
@@ -462,7 +465,7 @@ const downloadHandler = {
     if (!url) return
     const record = await downloadHandler.beforeDownloadVOD(targetID, url)
 
-    const { cmdCommand, fileName } = record
+    const { cmdCommand, fileName, totalDuration } = record
 
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
     if (userFileHandleOption) {
@@ -470,10 +473,54 @@ const downloadHandler = {
     }
 
     await cp.exec('start ' + cmdCommand, async (error, stdout, stderr) => {
-      const vodDuriation = await videoHandler.getDuration(`${fileLocation.origin}\\${fileName}`)
-      console.log('vodDuriation:', vodDuriation)
-      await downloadHandler.afterDownloadVOD(targetID, url, error)
+      const vodFilePath = `${fileLocation.origin}\\${fileName}`
+      const vodDuration = await videoHandler.getDuration(vodFilePath)
+      if ((totalDuration - vodDuration) <= LossOfVODDurationAllowed) {
+        await downloadHandler.afterDownloadVOD(targetID, url, error)
+      } else {
+        await downloadHandler.reDownloadVOD(targetID, url, vodFilePath)
+      }
     })
+  },
+
+  /**
+   * 重新下載VOD檔案
+   * @param {string} targetID 實況者ID
+   * @param {string} url VOD網址
+   * @param {string} filePathToDelete 下載失敗的影片位址
+   */
+  async reDownloadVOD(targetID, url, filePathToDelete) {
+    const vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
+    const recordIndex = vodRecord.onGoing.findIndex(record => record.url === url)
+    if (recordIndex !== -1) {
+      const record = vodRecord.onGoing[recordIndex]
+      if (record.retryTimes >= maxReDownloadTimes) {
+        helper.announcer(recordAction.record.reachLimit(targetID, url))
+        return
+      }
+
+      // 刪除原始檔案
+      if (fs.existsSync(filePathToDelete)) {
+        fs.unlinkSync(filePathToDelete)
+      }
+
+      // 更新下載資訊
+      record.startDownloadTime = Date.now() + record.reTryInterval
+      record.status = 'reDownload'
+      record.retryTimes++
+
+      // 將檔案從onGoing退回ready，等待下一輪下載時間
+      if (!vodRecord.queue.includes(record.startDownloadTime)) {
+        vodRecord.queue.push(record.startDownloadTime)
+      }
+      vodRecord.ready.push(record)
+      vodRecord.onGoing.splice(recordIndex, 1)
+      await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      // 立即重新下載?
+      // await downloadHandler.downloadVOD(targetID, url)
+    } else {
+      helper.announcer(recordAction.record.vodDownloadDetailLoss(targetID, url, 'warn'))
+    }
   },
 
   async startToRecordVOD(vodRecord) {
@@ -621,9 +668,9 @@ const modelHandler = {
       const isRecordExist = vodRecord.ready.some(record => record.url === url)
       if (isRecordExist) continue
       const videoLengthDetail = await webHandler.getVideoDuration(url)
-      const { isFetchSuccess } = videoLengthDetail
+      const { isFetchSuccess, formatTime } = videoLengthDetail
       const videoID = url.split('videos/')[1]
-      const fileName = downloadHandler.getFileName(targetID, videoID, timeString)
+      const fileName = downloadHandler.getFileName(targetID, videoID, timeString, formatTime)
       vodRecord.ready.push({
         twitchID: targetID,
         url,
