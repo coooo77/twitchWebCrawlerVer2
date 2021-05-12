@@ -386,7 +386,7 @@ const downloadHandler = {
     if (!formatTime) formatTime = '000000'
     return videoID
       ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}_${formatTime}.ts`
-      : `${prefix}${targetID}_twitch_${timeString}_${formatTime}.ts`
+      : `${prefix}${targetID}_twitch_${timeString}.ts`
   },
 
   getTimeString() {
