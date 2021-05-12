@@ -497,6 +497,12 @@ const downloadHandler = {
       const record = vodRecord.onGoing[recordIndex]
       if (record.retryTimes >= maxReDownloadTimes) {
         helper.announcer(recordAction.record.reachLimit(targetID, url))
+        // 將OnGoing紀錄移動到error
+        record.status = 'reach download limit'
+        record.retryTimes++
+        vodRecord.error.push(record)
+        vodRecord.onGoing.splice(recordIndex, 1)
+        await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
         return
       }
 
