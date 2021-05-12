@@ -26,12 +26,17 @@ const {
 } = recordSetting
 
 const {
-  minutesToDelay
+  fileLocation,
+  minutesToDelay,
+  maxReDownloadTimes,
+  reTryDownloadInterval,
+  LossOfVODDurationAllowed
 } = processSetting
 
 const { app, sorter } = require('../config/announce');
 const { login, homePage, VOD } = require('../config/domSelector');
-const { livingChannel } = app.recordAction
+const { recordAction } = app
+const { livingChannel } = recordAction
 
 const helper = {
   wait(ms) {
@@ -374,12 +379,13 @@ const downloadHandler = {
    * @param {string} targetID 實況者ID
    * @param {string} videoID VOD影片ID
    * @param {string} timeString 影片下載的時間
+   * @param {string} formatTime 影片時間
    */
-  getFileName(targetID, videoID = null, timeString = null) {
+  getFileName(targetID, videoID = null, timeString = null, formatTime) {
     if (!timeString) timeString = downloadHandler.getTimeString()
-
+    if (!formatTime) formatTime = '000000'
     return videoID
-      ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}.ts`
+      ? `${prefix}${targetID}_TwitchLive_${timeString}_ID_${videoID}_${formatTime}.ts`
       : `${prefix}${targetID}_twitch_${timeString}.ts`
   },
 
@@ -411,7 +417,7 @@ const downloadHandler = {
 
   async beforeDownloadVOD(targetID, url) {
     let vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
-    let recordIndex = vodRecord.ready.findIndex(record => record.url === url)
+    const recordIndex = vodRecord.ready.findIndex(record => record.url === url)
     let record = vodRecord.ready[recordIndex]
 
     record.status = 'downloading'
@@ -421,7 +427,7 @@ const downloadHandler = {
     modelHandler.sterilizeVodRecord(vodRecord, targetID, url, record)
     await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
 
-    return record.cmdCommand
+    return record
   },
 
   async afterDownloadVOD(targetID, url, error) {
@@ -458,16 +464,64 @@ const downloadHandler = {
 
   async downloadVOD(targetID, url) {
     if (!url) return
-    const cmd = await downloadHandler.beforeDownloadVOD(targetID, url)
+    const record = await downloadHandler.beforeDownloadVOD(targetID, url)
+
+    const { cmdCommand, fileName, totalDuration } = record
 
     const userFileHandleOption = await fileHandler.getUserFileHandleOption(targetID)
     if (userFileHandleOption) {
       await modelHandler.updateProcessorFile('queue', targetID, null)
     }
 
-    await cp.exec('start ' + cmd, async (error, stdout, stderr) => {
-      await downloadHandler.afterDownloadVOD(targetID, url, error)
+    await cp.exec('start ' + cmdCommand, async (error, stdout, stderr) => {
+      const vodFilePath = `${fileLocation.origin}\\${fileName}`
+      const vodDuration = await videoHandler.getDuration(vodFilePath)
+      if ((totalDuration - vodDuration) <= LossOfVODDurationAllowed) {
+        await downloadHandler.afterDownloadVOD(targetID, url, error)
+      } else {
+        await downloadHandler.reDownloadVOD(targetID, url, vodFilePath)
+      }
     })
+  },
+
+  /**
+   * 重新下載VOD檔案
+   * @param {string} targetID 實況者ID
+   * @param {string} url VOD網址
+   * @param {string} filePathToDelete 下載失敗的影片位址
+   */
+  async reDownloadVOD(targetID, url, filePathToDelete) {
+    const vodRecord = await modelHandler.getJSObjData('./model/vodRecord.json')
+    const recordIndex = vodRecord.onGoing.findIndex(record => record.url === url)
+    if (recordIndex !== -1) {
+      const record = vodRecord.onGoing[recordIndex]
+      if (record.retryTimes >= maxReDownloadTimes) {
+        helper.announcer(recordAction.record.reachLimit(targetID, url))
+        return
+      }
+
+      // 刪除原始檔案
+      if (fs.existsSync(filePathToDelete)) {
+        fs.unlinkSync(filePathToDelete)
+      }
+
+      // 更新下載資訊
+      record.startDownloadTime = Date.now() + record.reTryInterval
+      record.status = 'reDownload'
+      record.retryTimes++
+
+      // 將檔案從onGoing退回ready，等待下一輪下載時間
+      if (!vodRecord.queue.includes(record.startDownloadTime)) {
+        vodRecord.queue.push(record.startDownloadTime)
+      }
+      vodRecord.ready.push(record)
+      vodRecord.onGoing.splice(recordIndex, 1)
+      await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      // 立即重新下載?
+      // await downloadHandler.downloadVOD(targetID, url)
+    } else {
+      helper.announcer(recordAction.record.vodDownloadDetailLoss(targetID, url, 'warn'))
+    }
   },
 
   async startToRecordVOD(vodRecord) {
@@ -614,8 +668,10 @@ const modelHandler = {
       if (!url) continue
       const isRecordExist = vodRecord.ready.some(record => record.url === url)
       if (isRecordExist) continue
+      const videoLengthDetail = await webHandler.getVideoDuration(url)
+      const { isFetchSuccess, formatTime } = videoLengthDetail
       const videoID = url.split('videos/')[1]
-      const fileName = downloadHandler.getFileName(targetID, videoID, timeString)
+      const fileName = downloadHandler.getFileName(targetID, videoID, timeString, formatTime)
       vodRecord.ready.push({
         twitchID: targetID,
         url,
@@ -624,9 +680,13 @@ const modelHandler = {
         createdTime: Date.now(),
         createdLocalTime: new Date().toLocaleString(),
         status: 'not download yet',
-        isTaskQueue,
         startDownloadTime,
-        finishedTime: null
+        isTaskQueue,
+        finishedTime: null,
+        reTryInterval: reTryDownloadInterval,
+        retryTimes: 0,
+        formatTime: isFetchSuccess ? videoLengthDetail.formatTime : undefined,
+        totalDuration: isFetchSuccess ? videoLengthDetail.totalDuration : undefined
       })
     }
 
@@ -772,6 +832,51 @@ const webHandler = {
       await helper.wait(reTryInterval / count)
     }
   },
+
+  /**
+   * 擷取VOD時間
+   * @param {object} page puppeteerPageInstance
+   * @param {number} reTryInterval 總擷取的時間(毫秒)
+   * @param {number} count 總擷取的時間內的擷取次數上限
+   * @returns {object} 影片長度資訊
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async waitForFetchVODDuration(page, reTryInterval, count) {
+    let retryTimes = 0
+    let formatTime = 0
+    let rawTimeData = {
+      formatTime: '',
+      isFetchSuccess: false,
+      totalDuration: -1
+    }
+    while (retryTimes < count && formatTime <= 0) {
+      retryTimes++
+      rawTimeData = await webHandler.fetchVODDurationEl(page)
+      formatTime = rawTimeData.isFetchSuccess ? Number(rawTimeData.formatTime) : 0
+      formatTime
+      await helper.wait(reTryInterval / count)
+    }
+    return rawTimeData
+  },
+
+  async fetchVODDurationEl(page) {
+    const rawTimeData = await page.evaluate(selector => {
+      const seekBarElement = document.querySelector(selector)
+      return ({
+        formatTime: seekBarElement ? seekBarElement.innerText : undefined,
+        durationInSecond: seekBarElement ? seekBarElement.dataset.aValue : undefined,
+        isFetchSuccess: seekBarElement ? true : false
+      })
+    }, VOD.videoDuration)
+    if (rawTimeData && rawTimeData.formatTime) {
+      // 看起來時間格式會固定是00:00:00，而不會有00:00的情況
+      const formatTimeArr = rawTimeData.formatTime.split(':')
+      rawTimeData.formatTime = formatTimeArr.join('')
+      rawTimeData.durationInSecond = Number(rawTimeData.durationInSecond)
+    }
+    return rawTimeData
+  },
+
   async checkVODRecord(target, page, vodRecord) {
     const { baseUrl, videos } = url
     const { checkStreamContentType, twitchID } = target
@@ -832,7 +937,56 @@ const webHandler = {
       return null
     }
   },
+
+  /**
+   * 由VOD網址提供影片長度，包含小時、分、秒 + 總秒數 + 是否有取到資料
+   * @param {string} url VOD網址 Ex: https://www.twitch.tv/videos/1016665654
+   * @returns {object} 影片長度資訊 
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async getVideoDuration(url) {
+    let videoDurationInfo = {
+      formatTime: '',
+      isFetchSuccess: false,
+      totalDuration: -1
+    }
+    if (global.browser) {
+      const page = await global.browser.newPage()
+      videoDurationInfo = await webHandler.fetchVODDuration(page, url)
+    }
+    return videoDurationInfo
+  },
+
+  /**
+   * 爬蟲爬取VOD長度資訊
+   * @param {object} page puppeteerPageInstance
+   * @returns {object} 影片長度資訊
+   * { formatTime: string, totalDuration:number, isFetchSuccess:boolean }
+   */
+  async fetchVODDuration(page, url) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      await helper.wait(1000)
+      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 3000, 5)
+      const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
+      const returnData = {
+        formatTime: '',
+        isFetchSuccess: false,
+        totalDuration: -1
+      }
+      await page.close()
+      if (isFetchSuccess) {
+        returnData.formatTime = formatTime
+        returnData.isFetchSuccess = true
+        returnData.totalDuration = durationInSecond
+      }
+      return returnData
+    } catch (error) {
+      console.error('error at function: fetchVODLength', error)
+    }
+  }
 }
+
 
 const fileHandler = {
   /**
