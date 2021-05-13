@@ -859,7 +859,6 @@ const webHandler = {
       retryTimes++
       rawTimeData = await webHandler.fetchVODDurationEl(page)
       formatTime = rawTimeData.isFetchSuccess ? Number(rawTimeData.formatTime) : 0
-      formatTime
       await helper.wait(reTryInterval / count)
     }
     return rawTimeData
@@ -973,7 +972,7 @@ const webHandler = {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' })
       await helper.wait(1000)
-      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 3000, 5)
+      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 3000, 10)
       const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
       const returnData = {
         formatTime: '',
