@@ -46,7 +46,8 @@ module.exports = {
       seedData: 'Seed data seedData.json updated',
       isStreaming: 'Stream record isStreaming.json updated',
       vodRecord: 'VOD recorder vodRecord.json updated',
-      processor: 'File handling record processor.json updated'
+      processor: 'File handling record processor.json updated',
+      debugLog: 'Debug Log debugLog.json updated'
     },
     batchFile: {
       isExist: twitchID => `File ${twitchID}.bat exists`,
