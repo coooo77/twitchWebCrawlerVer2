@@ -88,7 +88,7 @@
   })
 
   settings.json.forEach(async (setting) => {
-    await makeJsonIfNotExist(setting, setting.fileLocation)
+    await makeJsonIfNotExist(setting)
   })
 
   announcer(initiationIsFinished)
