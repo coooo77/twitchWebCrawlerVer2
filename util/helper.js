@@ -330,6 +330,32 @@ const helper = {
       )
     }
     return downloadTime
+  },
+
+  /**
+   * debug紀錄使用
+   * @param {string} functionName 紀錄log的地點
+   * @param {any} payload 程式輸出的內容
+   * @param {string} note 額外註解
+   */
+  async debuglog(functionName, payload, note = '') {
+    const fileName = 'debugLog'
+    const debugLogPath = `./model/${fileName}.json`
+    if (!fs.existsSync(debugLogPath)) {
+      const defaultData = []
+      await modelHandler.saveJSObjData(defaultData, fileName)
+    }
+
+    const debugLog = await modelHandler.getJSObjData(debugLogPath)
+    const logTime = new Date().toLocaleString()
+    const log = {
+      note,
+      logTime,
+      payload,
+      functionName,
+    }
+    debugLog.push(log)
+    await modelHandler.saveJSObjData(debugLog, fileName)
   }
 }
 
@@ -495,8 +521,29 @@ const downloadHandler = {
     const recordIndex = vodRecord.onGoing.findIndex(record => record.url === url)
     if (recordIndex !== -1) {
       const record = vodRecord.onGoing[recordIndex]
+
+      if (!record.totalDuration) {
+        const videoLengthDetail = await webHandler.getVideoDuration(url)
+        const { isFetchSuccess, formatTime, totalDuration } = videoLengthDetail
+        if (isFetchSuccess) {
+          record.formatTime = formatTime
+          record.totalDuration = totalDuration
+        } else {
+          record.status = 'video duration lose'
+          vodRecord.error.push(record)
+          vodRecord.onGoing.splice(recordIndex, 1)
+          await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+          return
+        }
+      }
+
       if (record.retryTimes >= maxReDownloadTimes) {
         helper.announcer(recordAction.record.reachLimit(targetID, url))
+        record.status = 'reach download limit'
+        record.retryTimes++
+        vodRecord.error.push(record)
+        vodRecord.onGoing.splice(recordIndex, 1)
+        await modelHandler.saveJSObjData(vodRecord, 'vodRecord')
         return
       }
 
@@ -669,7 +716,12 @@ const modelHandler = {
       const isRecordExist = vodRecord.ready.some(record => record.url === url)
       if (isRecordExist) continue
       const videoLengthDetail = await webHandler.getVideoDuration(url)
-      const { isFetchSuccess, formatTime } = videoLengthDetail
+
+      // DEBUG
+      await helper.debuglog('addReadyData', videoLengthDetail, 'videoLengthDetail')
+      // DEBUG
+
+      const { isFetchSuccess, formatTime, totalDuration } = videoLengthDetail
       const videoID = url.split('videos/')[1]
       const fileName = downloadHandler.getFileName(targetID, videoID, timeString, formatTime)
       vodRecord.ready.push({
@@ -685,9 +737,13 @@ const modelHandler = {
         finishedTime: null,
         reTryInterval: reTryDownloadInterval,
         retryTimes: 0,
-        formatTime: isFetchSuccess ? videoLengthDetail.formatTime : undefined,
-        totalDuration: isFetchSuccess ? videoLengthDetail.totalDuration : undefined
+        formatTime: isFetchSuccess ? formatTime : undefined,
+        totalDuration: isFetchSuccess ? totalDuration : undefined
       })
+
+      // DEBUG
+      await helper.debuglog('addReadyData', vodRecord.ready[vodRecord.ready.length - 1], 'vodRecord.ready')
+      // DEBUG
     }
 
     delete vodRecord.pending[targetID]
@@ -847,13 +903,12 @@ const webHandler = {
     let rawTimeData = {
       formatTime: '',
       isFetchSuccess: false,
-      totalDuration: -1
+      totalDuration: undefined
     }
     while (retryTimes < count && formatTime <= 0) {
       retryTimes++
       rawTimeData = await webHandler.fetchVODDurationEl(page)
       formatTime = rawTimeData.isFetchSuccess ? Number(rawTimeData.formatTime) : 0
-      formatTime
       await helper.wait(reTryInterval / count)
     }
     return rawTimeData
@@ -948,7 +1003,7 @@ const webHandler = {
     let videoDurationInfo = {
       formatTime: '',
       isFetchSuccess: false,
-      totalDuration: -1
+      totalDuration: undefined
     }
     if (global.browser) {
       const page = await global.browser.newPage()
@@ -966,13 +1021,12 @@ const webHandler = {
   async fetchVODDuration(page, url) {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' })
-      await helper.wait(1000)
-      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 3000, 5)
+      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 5000, 20)
       const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
       const returnData = {
         formatTime: '',
         isFetchSuccess: false,
-        totalDuration: -1
+        totalDuration: undefined
       }
       await page.close()
       if (isFetchSuccess) {

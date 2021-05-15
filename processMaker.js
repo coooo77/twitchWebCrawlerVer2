@@ -26,7 +26,7 @@ const config = {
       0.9
     ]
   },
-  isAutoIntegrate: false,
+  isAutoIntegrate: true,
   processorDataPath: `${__dirname}\\model\\processor.json`,
   filesSourcePath: `${__dirname}\\model`,
   filesDestinationPath: 'D:\\JD'
@@ -51,10 +51,10 @@ if (videos.length !== 0) {
 
   // 製作queue資料
   const objKeys = Object.keys(filesSetting)
-  const fileHandleTimes = objKeys.reduce((acc, keys) => {
+  const fileHandleTimes = objKeys.reduce((acc, keys, index) => {
     return {
       ...acc,
-      [keys]: new Date()
+      [keys]: new Date(Date.now() + index * 1000 * 60)
     }
   }, {})
 
