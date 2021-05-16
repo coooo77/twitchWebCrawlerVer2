@@ -793,6 +793,13 @@ const modelHandler = {
 }
 
 const webHandler = {
+  async clickEl(page, selector) {
+    const target = await page.$(selector)
+    if (target) {
+      page.click(selector)
+    }
+  },
+
   async clickAndInput(page, selector, inputContent) {
     await page.click(selector)
     await page.keyboard.type(inputContent)
@@ -822,6 +829,7 @@ const webHandler = {
     await webHandler.clickAndInput(page, login.inputSMS, SMS)
     await page.click(login.confirmSMSBtn)
   },
+
   async scrollDownUntilCanNot(page) {
     // let count = 0
     let height = await webHandler.measureHeight(page)
@@ -879,13 +887,24 @@ const webHandler = {
     }
   },
 
-  async waitForSpecificDomElement(page, selector, reTryInterval, count) {
+  /**
+   * 等待特定HTML element出現
+   * @param {object}} page puppeteer產生的page instance
+   * @param {string} selector 目標dom selector
+   * @param {number} reTryInterval 總等待時間
+   * @param {number} count 總擷取次數
+   * @param {function} clickElCallBack 等待到元素後執行點擊
+   */
+  async waitForSpecificDomElement(page, selector, reTryInterval, count, clickElCallBack = null) {
     let waitFor = await page.$(selector)
     let retryTimes = 0
     while (!waitFor && retryTimes < count) {
       retryTimes++
       waitFor = await page.$(selector)
       await helper.wait(reTryInterval / count)
+    }
+    if (callBack) {
+      await clickElCallBack(page, selector)
     }
   },
 
@@ -1021,7 +1040,8 @@ const webHandler = {
   async fetchVODDuration(page, url) {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' })
-      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 5000, 20)
+      await webHandler.waitForSpecificDomElement(page, VOD.startToWatchBtn, 2000, 5, webHandler.clickEl)
+      const rawTimeData = await webHandler.waitForFetchVODDuration(page, 2000, 5)
       const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
       const returnData = {
         formatTime: '',
