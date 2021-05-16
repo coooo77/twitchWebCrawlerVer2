@@ -717,10 +717,6 @@ const modelHandler = {
       if (isRecordExist) continue
       const videoLengthDetail = await webHandler.getVideoDuration(url)
 
-      // DEBUG
-      await helper.debuglog('addReadyData', videoLengthDetail, 'videoLengthDetail')
-      // DEBUG
-
       const { isFetchSuccess, formatTime, totalDuration } = videoLengthDetail
       const videoID = url.split('videos/')[1]
       const fileName = downloadHandler.getFileName(targetID, videoID, timeString, formatTime)
@@ -740,10 +736,6 @@ const modelHandler = {
         formatTime: isFetchSuccess ? formatTime : undefined,
         totalDuration: isFetchSuccess ? totalDuration : undefined
       })
-
-      // DEBUG
-      await helper.debuglog('addReadyData', vodRecord.ready[vodRecord.ready.length - 1], 'vodRecord.ready')
-      // DEBUG
     }
 
     delete vodRecord.pending[targetID]
