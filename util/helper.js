@@ -887,16 +887,13 @@ const webHandler = {
    * @param {number} count 總擷取次數
    * @param {function} clickElCallBack 等待到元素後執行點擊
    */
-  async waitForSpecificDomElement(page, selector, reTryInterval, count, clickElCallBack = null) {
+  async waitForSpecificDomElement(page, selector, reTryInterval, count) {
     let waitFor = await page.$(selector)
     let retryTimes = 0
     while (!waitFor && retryTimes < count) {
       retryTimes++
       waitFor = await page.$(selector)
       await helper.wait(reTryInterval / count)
-    }
-    if (clickElCallBack) {
-      await clickElCallBack(page, selector)
     }
   },
 
@@ -1032,7 +1029,8 @@ const webHandler = {
   async fetchVODDuration(page, url) {
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' })
-      await webHandler.waitForSpecificDomElement(page, VOD.startToWatchBtn, 2000, 5, webHandler.clickEl)
+      await webHandler.waitForSpecificDomElement(page, VOD.startToWatchBtn, 2000, 5)
+      await webHandler.clickEl(page, VOD.startToWatchBtn)
       const rawTimeData = await webHandler.waitForFetchVODDuration(page, 2000, 5)
       const { isFetchSuccess, durationInSecond, formatTime } = rawTimeData
       const returnData = {
