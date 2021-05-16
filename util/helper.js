@@ -895,7 +895,7 @@ const webHandler = {
       waitFor = await page.$(selector)
       await helper.wait(reTryInterval / count)
     }
-    if (callBack) {
+    if (clickElCallBack) {
       await clickElCallBack(page, selector)
     }
   },
