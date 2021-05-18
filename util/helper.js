@@ -857,15 +857,19 @@ const webHandler = {
             const html = node.innerHTML
             if (!html) return
             const handleHtml = html.split(' ')
-            const href = handleHtml.filter(str => str.includes('href='))
-            if (!href[1]) return
-            const twitchID = href[1].split('/')[1]
+            const href = handleHtml.filter(str => str.includes('href'))
+            if (!href) return
+            const user = href.find(str => str.includes('videos'))
+            if (!user) return
+            const twitchID = user.split('/')[1]
+
             let streamTypes
-            if (!href[2]) {
-              streamTypes = null
+            const types = href.find(str => str.includes('/game'))
+            if (types) {
+              const type = types.split('">')
+              streamTypes = type.length !== 0 ? type[0].split('/')[3] : null
             } else {
-              const gameTypeHref = href[2].split('"')[1]
-              streamTypes = gameTypeHref.split('/')[3]
+              streamTypes = null
             }
             return ({ twitchID, streamTypes })
           })

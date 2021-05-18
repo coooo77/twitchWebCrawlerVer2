@@ -13,7 +13,7 @@ module.exports = {
   homePage: {
     mainBody: 'main > div.root-scrollable.scrollable-area > div.simplebar-scroll-content > div',
     scrollBody: 'main > div.root-scrollable.scrollable-area > div.simplebar-scroll-content',
-    liveCannelCard: 'article > div.tw-item-order-2.tw-mg-t-1 > div > div.tw-flex-grow-1.tw-flex-shrink-1.tw-full-width.tw-item-order-2.tw-media-card-meta__text-container'
+    liveCannelCard: '.live-channel-card'
   },
   VOD: {
     videoUrl: 'a[data-a-target="preview-card-image-link"]',
