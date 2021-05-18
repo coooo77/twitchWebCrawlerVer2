@@ -10,6 +10,7 @@ module.exports = {
     askSMS: 'Enter SMS number : ',
     askSMSAgain: 'SMS input action fail, enter your SMS again : ',
     noDataInfo: 'Account or password missed, please fill it!',
+    noOnlineInfo: 'Can not fetch any of online streamer data, errors may occurred.',
     noUserInfo: user => `Can not find User ${user}, start to create data`,
     userRecordDisabled: (user, config) => `User ${user} config: ${config} is active, stopping to record stream. Set it to false if you want to record it.`,
     recordAction: {
