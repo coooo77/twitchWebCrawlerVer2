@@ -87,6 +87,7 @@ module.exports = async (browser) => {
 
   } catch (error) {
     console.error(error)
+    await helper.debuglog('Error', error)
   } finally {
     await page.close();
     // await browser.close()
