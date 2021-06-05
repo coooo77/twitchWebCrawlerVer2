@@ -290,12 +290,13 @@ const videoHandler = {
           resolve(processedFileNames)
         } else {
           const fileSource = `${filePath}\\${fileName}`
+          const fileProcessedSource = `${filePath}\\${processFileName}`
           const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
           cp.exec(isShowCmd + cmd, (error, stdout, stderr) => {
             if (!error) {
               try {
                 if (!keepOriginalFile) {
-                  if (fs.existsSync(fileSource)) {
+                  if (!fs.existsSync(fileProcessedSource)) {
                     throw new Error('Processed file missed, can not delete original file.')
                   } else {
                     videoHandler.deleteFile(fileName, fileSource)
