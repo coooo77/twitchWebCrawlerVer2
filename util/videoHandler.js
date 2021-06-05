@@ -117,7 +117,7 @@ const videoHandler = {
           })
         }
       } catch (error) {
-        reject({ ProcedureName: 'fileCombiner', error })
+        reject({ ProcedureName: 'fileCombiner', error: error.message })
       }
     })
   },
@@ -165,7 +165,7 @@ const videoHandler = {
             }
           })
       } catch (error) {
-        reject({ ProcedureName: 'screenShot', error })
+        reject({ ProcedureName: 'screenShot', error: error.message })
       }
     })
   },
@@ -180,7 +180,7 @@ const videoHandler = {
             resolve(duration)
           })
       } catch (error) {
-        reject({ ProcedureName: 'getDuration', error })
+        reject({ ProcedureName: 'getDuration', error: error.message })
       }
     })
   },
@@ -293,20 +293,28 @@ const videoHandler = {
           const cmd = videoHandler.getFFMPEGCmd(fileSource, processFileName, mute, compress)
           cp.exec(isShowCmd + cmd, (error, stdout, stderr) => {
             if (!error) {
-              if (!keepOriginalFile) {
-                videoHandler.deleteFile(fileName, fileSource)
-              } else {
-                videoHandler.moveFilesToProcessed([fileName])
+              try {
+                if (!keepOriginalFile) {
+                  if (fs.existsSync(fileSource)) {
+                    throw new Error('Processed file missed, can not delete original file.')
+                  } else {
+                    videoHandler.deleteFile(fileName, fileSource)
+                  }
+                } else {
+                  videoHandler.moveFilesToProcessed([fileName])
+                }
+                processedFileNames.push(processFileName)
+                resolve(processedFileNames)
+              } catch (error) {
+                reject({ ProcedureName: 'processVideo ffmpeg', error: error.message })
               }
-              processedFileNames.push(processFileName)
-              resolve(processedFileNames)
             } else {
-              reject({ ProcedureName: 'processVideo ffmpeg', error: error })
+              reject({ ProcedureName: 'processVideo ffmpeg', error })
             }
           })
         }
       } catch (error) {
-        reject({ ProcedureName: 'processVideo', error })
+        reject({ ProcedureName: 'processVideo', error: error.message })
       }
     })
   },
@@ -406,7 +414,7 @@ const videoHandler = {
         resolve()
       } catch (error) {
         console.error(error)
-        reject({ ProcedureName: 'saveJSObjData', error })
+        reject({ ProcedureName: 'saveJSObjData', error: error.message })
       }
     })
   },
