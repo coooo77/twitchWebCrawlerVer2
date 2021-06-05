@@ -1,5 +1,8 @@
 const fs = require('fs')
 
+/*
+process
+*/
 const config = {
   processOption: {
     "keepOriginalFile": false,
@@ -31,6 +34,41 @@ const config = {
   filesSourcePath: `${__dirname}\\model`,
   filesDestinationPath: 'D:\\JD'
 }
+
+/*
+photo
+*/
+// const config = {
+//   processOption: {
+//     "keepOriginalFile": true,
+//     "mute": false,
+//     "compress": false,
+//     "combine": false,
+//     "validProcessPeriod": {
+//       "from": {
+//         "hour": 0,
+//         "minute": 0
+//       },
+//       "to": {
+//         "hour": 23,
+//         "minute": 59
+//       }
+//     },
+//     "screenshots": [
+//       0.3,
+//       0.4,
+//       0.5,
+//       0.6,
+//       0.7,
+//       0.8,
+//       0.9
+//     ]
+//   },
+//   isAutoIntegrate: true,
+//   processorDataPath: `${__dirname}\\model\\processor.json`,
+//   filesSourcePath: `${__dirname}\\model`,
+//   filesDestinationPath: 'D:\\JD'
+// }
 
 const files = fs.readdirSync(config.filesSourcePath)
 const videos = files.filter(file => file.includes('.ts') || file.includes('.mp4'))
