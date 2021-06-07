@@ -44,14 +44,14 @@ const helper = {
   },
   /**
    * 列印指定的訊息
-   * @param {sting} message 訊息內容
-   * @param {sting} type system | warn | time | mode
+   * @param {string} message 訊息內容
+   * @param {'system' | 'warn' | 'time' | 'mode'} type system | warn | time | mode
    */
   announcer(message, type = 'system') {
     if (type === 'system') {
       console.log(`[SYSTEM] ${message}`)
     } else if (type === 'warn') {
-      console.log(`\n[WARNING] ${message}` + '\n')
+      console.error(`\n[WARNING] ${message}` + '\n')
     } else if (type === 'time') {
       console.log(`\n[ LOG ] ${message}`)
     } else if (type === 'mode') {
@@ -1108,9 +1108,12 @@ const fileHandler = {
 
   /**
    * 取得設定的時間，用這個時間來更新queue
+   * @typedef {Object} ParseTime
+   * @property {number} hour 小時
+   * @property {number} minute 分鐘
    * @param {string} options 實況者影片設定(string)
    * @param {string} target 'from', 'to'
-   * @returns {object} 設定的時間 { hour:number, minute:number }
+   * @returns {ParseTime} 設定的時間 { hour:number, minute:number }
    */
   getParseTime(options, target) {
     // const timeNow = new Date()
@@ -1238,14 +1241,18 @@ const fileHandler = {
    */
   async checkFileTimeRange(processorFile, targetID, currentTime) {
     const userFileHandleData = processorFile.pending[targetID]
-    const { from, to } = userFileHandleData.processOption.validProcessPeriod
-    const fromTime = new Date().setHours(from.hour, from.minute)
-    const toTime = new Date().setHours(to.hour, to.minute)
-    if (toTime < currentTime) {
-      await fileHandler.delayProcessFileFor1Day(processorFile, targetID)
-    } else if (fromTime <= currentTime <= toTime) {
-      // 開始處理檔案
-      await fileHandler.startToProcessFile(processorFile, targetID)
+    if (userFileHandleData) {
+      const { from, to } = userFileHandleData.processOption.validProcessPeriod
+      const fromTime = new Date().setHours(from.hour, from.minute)
+      const toTime = new Date().setHours(to.hour, to.minute)
+      if (toTime < currentTime) {
+        await fileHandler.delayProcessFileFor1Day(processorFile, targetID)
+      } else if (fromTime <= currentTime <= toTime) {
+        // 開始處理檔案
+        await fileHandler.startToProcessFile(processorFile, targetID)
+      }
+    } else {
+      helper.announcer(app.processAction.pendingFileMissed(targetID), 'warn')
     }
   },
 

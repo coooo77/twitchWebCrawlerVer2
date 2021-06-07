@@ -59,6 +59,7 @@ module.exports = {
     processAction: {
       isStopped: millisecond => `File process procedure is occupied, delay ${Math.floor(millisecond / (60 * 1000))} minutes`,
       isStart: user => `Start to handle ${user}'s record`,
+      pendingFileMissed: user => `${user}'s pending record is missed`,
       folder: {
         isNotExist: dirName => `Folder ${dirName} is not exist`,
         startToCreateFolder: path => `Start to create recorder folder, path: ${path}`
