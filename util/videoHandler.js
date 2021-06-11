@@ -9,7 +9,8 @@ const {
   suffix,
   fileLocation,
   enableShowCmd,
-  processOutputType
+  processOutputType,
+  allowMultiFileTakeScreenShot
 } = processSetting
 
 const {
@@ -57,7 +58,7 @@ const videoHandler = {
         .then((processedFileNames) => fileCombiner(processedFileNames, targetID, !keepOriginalFile, combine))
         .then((processedFileName) => screenShotHandler(processedFileName, screenshots))
         .then((processedFileName) => processFinished(processedFileName, targetID))
-        .catch((error) => videoHandler.upDateOngoingFiles(targetID, 'error', { error }))
+        .catch((error) => videoHandler.upDateOngoingFiles(targetID, 'error', { error: error.message }))
     } catch (error) {
       videoHandler.upDateOngoingFiles(targetID, 'error', { error })
     }
@@ -133,17 +134,41 @@ const videoHandler = {
     return txtNameWithPath
   },
 
+  /**
+   * 串接拍照Promise
+   * @param {string[]} processedFileName 已經處理過的純檔案名稱，沒有檔案位置
+   * @param {number[]} screenshotRatios 拍照的位置
+   * @returns {Promise} 回傳processedFileName
+   */
   screenShotHandler(processedFileName, screenshotRatios) {
-    if (processedFileName.length === 1) {
-      return screenshotRatios.reduce((chain, currentRatio, currentIndex) => {
-        return chain.then(() => videoHandler.screenShot(processedFileName[0], currentRatio, currentIndex + 1))
-      }, Promise.resolve())
+    if (!allowMultiFileTakeScreenShot) {
+      // 不允許複數檔案拍照
+      if (processedFileName.length === 1) {
+        return screenshotRatios.reduce((chain, currentRatio, currentIndex) => {
+          return chain.then(() => videoHandler.screenShot(processedFileName[0], currentRatio, currentIndex + 1))
+        }, Promise.resolve())
+      } else {
+        Promise.resolve(processedFileName)
+      }
     } else {
-      Promise.resolve(processedFileName)
+      // 允許複數檔案拍照
+      const reduceChainArray = processedFileName.map(fileName => screenshotRatios.reduce((chain, currentRatio, currentIndex) => {
+        return chain.then(() => videoHandler.screenShot(fileName, currentRatio, currentIndex + 1, processedFileName))
+      }, Promise.resolve()))
+
+      return reduceChainArray.reduce((chain, currentPromise) => chain.then(() => currentPromise), Promise.resolve())
     }
   },
 
-  screenShot(processedFileName, screenshotRatio, index) {
+  /**
+   * 拍照Promise
+   * @param {string} processedFileName 當前處理的檔案名稱
+   * @param {number} screenshotRatio 拍照時間點
+   * @param {number} index 檔名index
+   * @param {string[]} AllFileNames 所有要處理的檔案名稱，同screenShotHandler的processedFileName參數
+   * @returns {Promise | Error} 回傳AllFileNames或錯誤
+   */
+  screenShot(processedFileName, screenshotRatio, index, AllFileNames) {
     return new Promise((resolve, reject) => {
       try {
         const root = videoHandler.getProcessPath(defaultPath.processed)
@@ -154,14 +179,14 @@ const videoHandler = {
               const cmd = `ffmpeg -ss ${duration * screenshotRatio} -i ${processedFileNameWithPath} -y -vframes 1 ${processedFileNameWithPath}-${index}.jpg`
               cp.exec(cmd, (error, stdout, stderr) => {
                 if (!error) {
-                  resolve([processedFileName])
+                  resolve(AllFileNames)
                 } else {
                   reject({ ProcedureName: 'screenShot ffmpeg', error })
                 }
               })
             } else {
               console.log('Loss Duration, skip shot')
-              resolve([processedFileName])
+              resolve(AllFileNames)
             }
           })
       } catch (error) {

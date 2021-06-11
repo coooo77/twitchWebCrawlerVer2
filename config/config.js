@@ -72,6 +72,7 @@ const config = {
     reTryDownloadInterval: 1000 * 60 * 30, // 下載失敗重新下載間隔(毫秒)
     maxReDownloadTimes: 10, // VOD重新下載次數上限
     LossOfVODDurationAllowed: 60 * 5, // VOD下載完能接受短少的時間長度
+    allowMultiFileTakeScreenShot: true
   },
   loginSetting: {
     isManual: false
