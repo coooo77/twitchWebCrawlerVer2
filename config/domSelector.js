@@ -16,10 +16,12 @@ module.exports = {
     liveCannelCard: '.live-channel-card'
   },
   VOD: {
+    videoTowerCard: '[data-a-target*="video-tower-card"]',
     videoUrl: 'a[data-a-target="preview-card-image-link"]',
     videoImage: 'div.preview-card-thumbnail__image > img',
     videoCategory: 'a[data-a-target="preview-card-game-link"]',
     videoDuration: 'p[data-a-target="player-seekbar-duration"]',
+    lastVOD: 'img[src*="https://vod-secure.twitch.tv/_404/404"]',
     startToWatchBtn: 'button[data-a-target="player-overlay-mature-accept"]'
   }
 }

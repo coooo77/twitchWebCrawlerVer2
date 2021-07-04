@@ -5,6 +5,16 @@ const twitchStreams = require('twitch-get-stream')
 const checkDiskSpace = require('check-disk-space')
 const videoHandler = require('./videoHandler')
 
+/**
+ * @typedef {import('./types.js').User} User
+ * @typedef {import('./types.js').UsersData} UsersData
+ * @typedef {import('./types.js').VodRecord} VodRecord
+ * @typedef {import('./types.js').ParseTime} ParseTime
+ * @typedef {import('./types.js').IsStreaming} IsStreaming
+ * @typedef {import('./types.js').OnlineStreamsData} OnlineStreamsData
+ * @typedef {import('./types.js').VideoUrlAndCategory} VideoUrlAndCategory
+ */
+
 const {
   url,
   loginSetting,
@@ -138,6 +148,13 @@ const helper = {
     }
   },
 
+  /**
+   * 檢查正在實況者清單
+   * @param {OnlineStreamsData[]} onlineStreamsData 實況者清單
+   * @param {IsStreaming} isStreaming 正在實況者們的資料
+   * @param {UsersData} usersData 實況者們的資料
+   * @param {VodRecord} vodRecord VOD紀錄
+   */
   async checkLivingChannel(onlineStreamsData, isStreaming, usersData, vodRecord) {
     helper.announcer(livingChannel.checkStatus)
     const livingChannelList = onlineStreamsData.map(channel => channel.twitchID)
@@ -190,23 +207,35 @@ const helper = {
   /**
    * 處理使用者下線，狀態更新、VOD紀錄
    * @param {string} targetID 實況者ID
-   * @param {object} isStreaming 正在實況者們的資料
-   * @param {object} usersData 實況者們的資料
-   * @param {object} vodRecord VOD紀錄
+   * @param {IsStreaming} isStreaming 正在實況者們的資料
+   * @param {User} usersData 實況者們的資料
+   * @param {VodRecord} vodRecord VOD紀錄
    */
   async offlineHandler(targetID, isStreaming, usersData, vodRecord) {
     /*
     TODO 要更新檢查資料的時間，以key來標記ID，value為時間
     */
     helper.announcer(livingChannel.userCloseStream(targetID))
+
     // 修正錄製VOD造成使用者無法下線問題
     await Promise.all([
-      modelHandler.removeRecord(isStreaming, targetID),
+      modelHandler.removeIsStreamingRecord(isStreaming, targetID),
       modelHandler.upDateIsRecording(usersData, targetID, false)
     ])
+
+
     // 下線 => 開始錄製VOD
     helper.recordVOD(usersData, targetID, vodRecord)
   },
+
+  /**
+   * 開始錄製影片
+   * @param {OnlineStreamsData[]} onlineStreamsData 實況者清單
+   * @param {IsStreaming} isStreaming 正在實況者們的資料
+   * @param {UsersData} usersData 實況者們的資料
+   * @param {VodRecord} vodRecord VOD紀錄
+   * @param {object} page puppeteerPageInstance
+   */
   async startToRecord(onlineStreamsData, isStreaming, usersData, vodRecord, page) {
     helper.announcer(app.recordAction.record.start)
     for (let i = 0; i < onlineStreamsData.length; i++) {
@@ -226,7 +255,10 @@ const helper = {
         }
       } if (user) {
         const { isActive, isStopRecordOnlineStream } = user.enableRecordVOD
-        // 檢查是否有新的VOD可以下載
+        /*
+          檢查是否有新的VOD可以下載
+          TODO: 因為每次都要去找VOD紀錄，造成效能低下，是否有更好的優化?
+        */
         if (isActive) {
           await webHandler.checkVODRecord(user, page, vodRecord)
         }
@@ -373,7 +405,7 @@ const downloadHandler = {
         ])
 
         await Promise.all([
-          modelHandler.removeRecord(isStreaming, targetID),
+          modelHandler.removeIsStreamingRecord(isStreaming, targetID),
           modelHandler.upDateIsRecording(usersData, targetID, false)
         ])
         await fileHandler.upDateProcessorData(fileName, targetID, preTime)
@@ -639,7 +671,12 @@ const modelHandler = {
     }
   },
 
-  async removeRecord(data, targetID) {
+  /**
+   * 移除正在實況者清單內的特定對象資料
+   * @param {IsStreaming} data
+   * @param {string} targetID 
+   */
+  async removeIsStreamingRecord(data, targetID) {
     const recordsIndex = data.records.findIndex(record => record.twitchID === targetID)
     const idsIndex = data.ids.findIndex(id => id === targetID)
     if (idsIndex !== -1) {
@@ -785,6 +822,18 @@ const modelHandler = {
 }
 
 const webHandler = {
+  /**
+   * 啟用puppeteer的console
+   * @param {object} page puppeteerPageInstance
+   * https://tinyurl.com/9pm6vun3
+   */
+  puppeteerConsole(page) {
+    page.on('console', msg => {
+      for (let i = 0; i < msg.args().length; ++i)
+        console.log(`${i}: ${msg.args()[i]}`);
+    })
+  },
+
   async clickEl(page, selector) {
     const target = await page.$(selector)
     if (target) {
@@ -848,6 +897,10 @@ const webHandler = {
     return height
   },
 
+  /**
+   * @param {object} page puppeteerPageInstance
+   * @returns {OnlineStreamsData[]} onlineStreamsData
+   */
   async getOnlineStreamsData(page) {
     try {
       const streamers = await page.evaluate(selector => {
@@ -885,11 +938,10 @@ const webHandler = {
 
   /**
    * 等待特定HTML element出現
-   * @param {object}} page puppeteer產生的page instance
+   * @param {object} page puppeteer產生的page instance
    * @param {string} selector 目標dom selector
    * @param {number} reTryInterval 總等待時間
    * @param {number} count 總擷取次數
-   * @param {function} clickElCallBack 等待到元素後執行點擊
    */
   async waitForSpecificDomElement(page, selector, reTryInterval, count) {
     let waitFor = await page.$(selector)
@@ -944,6 +996,30 @@ const webHandler = {
     return rawTimeData
   },
 
+  /**
+   * 開始取得VOD資料(目前沒有用到)
+   * @param {string} twitchID 
+   * @returns {VideoUrlAndCategory[] | null}
+   */
+  async startGetVODRecord(twitchID) {
+    const browser = global.browser
+    const page = await browser.newPage();
+
+    const { baseUrl, videos } = url
+    await page.goto(`${baseUrl}${twitchID}${videos}`, { waitUntil: 'domcontentloaded' });
+    await webHandler.waitForSpecificDomElement(page, VOD.videoImage, 3000, 10)
+    const VODWithUrlAndCategory = await webHandler.getVODRecord(page)
+
+    await page.close();
+    return VODWithUrlAndCategory
+  },
+
+  /**
+   * 取得VOD網址跟開始實況時間
+   * @param {User} target usersData內目標實況者的錄影設定
+   * @param {object} page puppeteerPageInstance
+   * @param {VodRecord} vodRecord VOD紀錄
+   */
   async checkVODRecord(target, page, vodRecord) {
     const { baseUrl, videos } = url
     const { checkStreamContentType, twitchID } = target
@@ -951,55 +1027,90 @@ const webHandler = {
     await webHandler.waitForSpecificDomElement(page, VOD.videoImage, 3000, 10)
 
     // 取得所有VOD網址
-    const latestVODUrlAndCategory = await webHandler.getVODRecord(page)
-    const latestVODUrl = latestVODUrlAndCategory ? latestVODUrlAndCategory.url : null
+    const VODWithUrlAndCategory = await webHandler.getVODRecord(page)
 
-    if (!latestVODUrl) return
+    const onGoingVOD = VODWithUrlAndCategory.find(VOD => VOD.isOnGoingStreaming)
+    if (onGoingVOD) {
+      /*
+        檢查是否有限制錄製類型
+        TODO:
+        1.有個問題點是想要減少爬蟲找VOD的次數，如果以vodRecord.pending是否有紀錄來判斷要不要找VOD，如果實況者沒開VOD就是要一直找
+        2.如果類型不正確，也是一直找，直到類型正確為止
+      */
+      // 檢查是否有限制錄製類型
+      const category = onGoingVOD.category
+      const { isActive, targetType } = checkStreamContentType
+      if (isActive && !targetType.includes(category)) {
+        helper.announcer(app.recordAction.record.stopVOD(twitchID))
+        return
+      }
 
-    // 檢查是否有限制錄製類型
-    const category = latestVODUrlAndCategory.category
-    const { isActive, targetType } = checkStreamContentType
-    if (isActive && !targetType.includes(category)) {
-      helper.announcer(app.recordAction.record.stopVOD(twitchID))
-      return
-    }
+      const latestVODUrl = onGoingVOD.url
+      // 更新vodRecord內的VOD網址
+      const { pending } = vodRecord
+      const timeString = downloadHandler.getTimeString()
+      const isUrlExist = pending[target.twitchID]
+        ? pending[target.twitchID].some(record => record.url === latestVODUrl)
+        : false
 
-    // 更新vodRecord內的VOD網址
-    const { pending } = vodRecord
-    const timeString = downloadHandler.getTimeString()
-    const isUrlExist = pending[target.twitchID]
-      ? pending[target.twitchID].some(record => record.url === latestVODUrl)
-      : false
-    if (!pending[target.twitchID]) {
-      pending[target.twitchID] = [{ url: latestVODUrl, timeString }]
-      modelHandler.saveJSObjData(vodRecord, 'vodRecord')
-    } else if (!isUrlExist && url) {
-      pending[target.twitchID].push({ url: latestVODUrl, timeString })
-      modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      if (!pending[target.twitchID]) {
+        pending[target.twitchID] = [{ url: latestVODUrl, timeString }]
+        modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      } else if (!isUrlExist && url) {
+        pending[target.twitchID].push({ url: latestVODUrl, timeString })
+        modelHandler.saveJSObjData(vodRecord, 'vodRecord')
+      }
     }
   },
 
+  /**
+   * @param {object} page puppeteerPageInstance
+   * @param {boolean} isGetNowStreaming 是否取得現在正在實況的VOD
+   * @returns {VideoUrlAndCategory[] | null} VODRecord
+   */
   async getVODRecord(page) {
     const firstVideoRecordImageSrc = await page.evaluate(selector => {
       const nodes = document.querySelector(selector)
       return nodes ? nodes.src : null
     }, VOD.videoImage)
-
     if (!firstVideoRecordImageSrc) return null
 
     if (firstVideoRecordImageSrc.includes('404')) {
       // 圖片含有404代表正在實況
       // https://vod-secure.twitch.tv/_404/404_processing_320x180.png
-      const videoUrlAndCategory = await page.evaluate(selector => {
-        const { videoUrl, videoCategory } = selector
-        let url = document.querySelector(videoUrl)
-        if (!url) return null
-        url = url.href.split('?')[0]
-        let category = document.querySelector(videoCategory)
-        category = category ? category.href.split('/game/')[1] : null
-        return { url, category }
+      const videosWithUrlAndCategory = await page.evaluate(selector => {
+        const { videoTowerCard, videoUrl, videoCategory, lastVOD } = selector
+
+        const videoTowerCards = document.querySelectorAll(videoTowerCard)
+
+        if (videoTowerCards) {
+          const result = Array.from(videoTowerCards).map(parentNode => {
+            // 取VOD網址
+            let url = parentNode.querySelector(videoUrl)
+
+            if (!url) return null
+            url = url.href.split('?')[0]
+            // 取VOD類型
+            let category = parentNode.querySelector(videoCategory)
+            category = category ? category.href.split('/game/')[1] : null
+
+            // 確認VOD是否正在實況
+            const isOnGoingStreaming = !!(parentNode.querySelector(lastVOD))
+            console.log({
+              url, category, isOnGoingStreaming
+            })
+
+            return {
+              url, category, isOnGoingStreaming
+            }
+          })
+
+          return result
+        } else {
+          return null
+        }
       }, VOD)
-      return videoUrlAndCategory
+      return videosWithUrlAndCategory
     } else {
       return null
     }
@@ -1108,9 +1219,6 @@ const fileHandler = {
 
   /**
    * 取得設定的時間，用這個時間來更新queue
-   * @typedef {Object} ParseTime
-   * @property {number} hour 小時
-   * @property {number} minute 分鐘
    * @param {string} options 實況者影片設定(string)
    * @param {string} target 'from', 'to'
    * @returns {ParseTime} 設定的時間 { hour:number, minute:number }
