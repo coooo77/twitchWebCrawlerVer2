@@ -52,8 +52,6 @@ const videoHandler = {
       moveFiles(fileNames, originalFilePath, toPath)
 
       // 開始處理檔案
-      // 需要確認到底每個promise傳出來的是什麼
-      // 單一檔案等同於不要合併，但是能拍照
       reductiveProcessChain(task)
         .then((processedFileNames) => fileCombiner(processedFileNames, targetID, !keepOriginalFile, combine))
         .then((processedFileName) => screenShotHandler(processedFileName, screenshots))
@@ -66,7 +64,7 @@ const videoHandler = {
 
   /**
    * 取得原始檔案、處理中或已經完成的檔案位置
-   * @param {string} type "origin" | "processing" |　"processed"
+   * @param {"origin" | "processing" |　"processed"} type 類型
    * @returns {string}　path 檔案位置
    */
   getProcessPath(type) {
@@ -357,7 +355,7 @@ const videoHandler = {
     let cmd = `ffmpeg -i ${fileSource}`
     const path = videoHandler.getProcessPath(defaultPath.processing)
     if (compress) {
-      cmd += ` -vcodec libx264 -crf 28 -preset ultrafast ${mute ? '-an' : ''} -y "${path}\\${processFileName}"`
+      cmd += ` -vsync 2 -vcodec libx264 -crf 28 -preset ultrafast ${mute ? '-an' : ''} -y "${path}\\${processFileName}"`
     } else if (mute) {
       cmd += ` -c copy -an -y "${path}\\${processFileName}"`
     }
