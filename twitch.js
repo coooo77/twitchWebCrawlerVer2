@@ -2,7 +2,7 @@ const { puppeteerSetting, checkStreamInterval } = require('./config/config.js')
 const { twitch } = require('./config/announce')
 const { startToMonitor, timeAnnounce } = twitch
 const { helper } = require('./util/helper')
-const { announcer } = helper
+const { announcer, debuglog } = helper
 const app = require('./app')
 const puppeteer = require('puppeteer-core');
 
@@ -12,8 +12,10 @@ function startApp(browser) {
   return new Promise((resolve, reject) => {
     try {
       const errorTimer = setTimeout(() => {
-        helper.announcer(twitch.errorOccurred, 'warn')
-      }, checkStreamInterval * 2);
+        announcer(twitch.errorOccurred, 'warn')
+        debuglog('startApp', 'Start app fail')
+        reject()
+      }, ((5 * 60 * 1000) + checkStreamInterval));
 
       setTimeout(async () => {
         announcer(timeAnnounce(recursionTime++), 'time')
@@ -22,25 +24,34 @@ function startApp(browser) {
         resolve()
       }, checkStreamInterval)
     } catch (error) {
-      console.error(error)
+      announcer(twitch.errorOccurred, 'warn')
+      debuglog('startApp', error.message)
       reject()
     }
   })
 }
 
-(async () => {
+async function mainProcess() {
   announcer(startToMonitor)
   announcer(timeAnnounce(recursionTime++), 'time')
-  const browser = await puppeteer.launch(puppeteerSetting);
-  // 用來VOD下載結束後確認時間長度
-  global.browser = browser
-  await app(browser)
-  while (true) {
-    await startApp(browser)
-    let used = process.memoryUsage();
-    for (let key in used) {
-      console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+  try {
+    await app(global.browser)
+    while (true) {
+      await startApp(global.browser)
+      let used = process.memoryUsage();
+      for (let key in used) {
+        console.log(`${key} ${Math.round(used[key] / 1024 / 1024 * 100) / 100} MB`);
+      }
+      used = null
     }
-    used = null
+  } catch (error) {
+    return mainProcess()
   }
-})()
+}
+
+async function startTwitch() {
+  global.browser = global.browser || await puppeteer.launch(puppeteerSetting)
+  mainProcess()
+}
+
+startTwitch()
