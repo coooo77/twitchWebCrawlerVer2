@@ -1029,7 +1029,10 @@ const webHandler = {
     // 取得所有VOD網址
     const VODWithUrlAndCategory = await webHandler.getVODRecord(page)
 
+    if (!VODWithUrlAndCategory) return
+
     const onGoingVOD = VODWithUrlAndCategory.find(VOD => VOD.isOnGoingStreaming)
+
     if (onGoingVOD) {
       /*
         檢查是否有限制錄製類型
